@@ -1,0 +1,23 @@
+{
+  "name": "morpheus",
+  "version": "0.1.0",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./string": "./dist/string/index.js",
+    "./tokens": "./dist/tokens/index.js"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^7"
+  },
+  "dependencies": {
+    "type-fest": "^5.9.0"
+  }
+}
