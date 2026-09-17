@@ -1,41 +1,30 @@
-import type { UnionToIntersection } from "type-fest";
 import { UnexpectedEOS, UnexpectedInput, type Parser } from "../parser";
-import { eos } from "../stream";
+import { eos, type Stream } from "../stream";
+import { createForToken } from "../combinators";
+import type { UnionToIntersection } from "type-fest";
 
-export type TokenDef<Name extends string, T = string> = {
-  readonly name: Name;
-  readonly match: RegExp | string;
-  readonly mapFn?: (arg: string) => T;
-};
+export type TokenNames<T> = keyof T;
 
-export type TokenType<Ts extends readonly TokenDef<any, unknown>[]> =
-  Ts extends readonly [
-    infer T extends TokenDef<any, unknown>,
-    ...infer Rest extends readonly TokenDef<any, unknown>[],
-  ]
-    ? | [T["name"], T["mapFn"] extends (arg: string) => infer T ? T : string]
-      | TokenType<Rest>
-    : never;
+type TokenType<T> = T extends { [K in keyof T]: unknown }
+  ? {
+      [K in keyof T]: [
+        K,
+        T[K] extends string ? T[K] : T[K] extends RegExp ? string : never,
+      ];
+    }[keyof T]
+  : never;
 
-export type TokenizerOutput<T extends readonly TokenDef<any, unknown>[]> = [
-  ...TokenType<T>,
-  number,
-];
-
-export class Tokenizer<const T extends readonly TokenDef<any, unknown>[]> {
+export class Lexer<T extends Record<any, string | RegExp>> {
   constructor(public readonly def: T) {}
 
-  *tokenize(input: string): Iterable<TokenizerOutput<T>> {
+  *tokenize(input: string): Iterable<TokenType<T>> {
     let cursor = 0;
     while (cursor < input.length) {
       let matched = false;
-      for (const { name, match, mapFn } of this.def) {
+      for (const [name, match] of Object.entries(this.def)) {
         if (typeof match === "string") {
           if (match === input.substring(cursor, cursor + match.length)) {
-            yield [
-              ...([name, mapFn ? mapFn(match) : match] as TokenType<T>),
-              cursor,
-            ];
+            yield [name, match] as TokenType<T>;
             cursor += match.length;
             matched = true;
             break;
@@ -45,13 +34,7 @@ export class Tokenizer<const T extends readonly TokenDef<any, unknown>[]> {
           r.lastIndex = cursor;
           const m = input.match(r);
           if (m !== null) {
-            yield [
-              ...([
-                name,
-                mapFn !== undefined ? mapFn(m[0]) : m[0],
-              ] as TokenType<T>),
-              cursor,
-            ];
+            yield [name, m[0]] as TokenType<T>;
             cursor += m[0].length;
             matched = true;
             break;
@@ -76,7 +59,7 @@ export type TokenValues<T extends readonly [string, unknown]> =
 export type ExtractNames<T extends readonly [string, unknown]> =
   T extends readonly [infer N extends string, unknown] ? N : never;
 
-export const createTokenFn =
+const createTokenFn =
   <T extends readonly [string, unknown]>() =>
   <Name extends ExtractNames<T>>(
     name: Name,
@@ -89,3 +72,28 @@ export const createTokenFn =
       else return new UnexpectedInput();
     };
   };
+
+export function createCombinators<T extends readonly [string, unknown]>() {
+  return {
+    token: createTokenFn<T>(),
+    ...createForToken<T>(),
+  };
+}
+
+export class TokenStream<T extends [string, unknown]> implements Stream<T> {
+  constructor(
+    public readonly tokens: T[],
+    public cursor: number = 0,
+  ) {}
+
+  consume() {
+    return new TokenStream<T>(this.tokens, this.cursor + 1);
+  }
+
+  peek() {
+    const value = this.tokens[this.cursor];
+    if (value === undefined) return eos;
+    const [n, v, _] = value;
+    return [n, v] as T;
+  }
+}

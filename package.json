@@ -5,7 +5,7 @@
   "exports": {
     ".": "./dist/index.js",
     "./string": "./dist/string/index.js",
-    "./tokens": "./dist/tokens/index.js"
+    "./lexer": "./dist/lexer/index.js"
   },
   "type": "module",
   "scripts": {
