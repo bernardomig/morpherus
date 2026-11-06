@@ -24,9 +24,10 @@ export function label<Tok, T>(
     const out = parser(stream);
     if (out instanceof ParseError) {
       out.label = expected;
-      out.message = out.message
-        ? `${out.message} (expected ${expected})`
-        : `Expected ${expected} at position ${out.position}`;
+      if (out.position === stream.position || out.expected.length === 0) {
+        out.expected = [expected];
+      }
+      out.message = `Expected ${out.expected.join(" or ")} at position ${out.position}`;
       return out;
     }
     return out;
@@ -85,6 +86,26 @@ export type OneOf<Tok, Ps extends [Parser<unknown, Tok>, ...Parser<unknown, Tok>
     ? T
     : never;
 
+function mergeErrors(a: ParseError, b: ParseError): ParseError {
+  if (b.position > a.position) return b;
+  if (a.position > b.position) return a;
+
+  const mergedExpected = Array.from(new Set([...a.expected, ...b.expected]));
+  const label = b.label ?? a.label;
+  const message =
+    mergedExpected.length > 0
+      ? `Expected ${mergedExpected.join(" or ")} at position ${a.position}`
+      : b.message || a.message || undefined;
+
+  if (a instanceof UnexpectedEOS || b instanceof UnexpectedEOS) {
+    return new UnexpectedEOS(a.position, message, label, mergedExpected);
+  }
+  if (a instanceof UnexpectedInput || b instanceof UnexpectedInput) {
+    return new UnexpectedInput(a.position, message, label, mergedExpected);
+  }
+  return new ParseError(a.position, message, label, mergedExpected);
+}
+
 export function oneOf<Tok, Ps extends readonly [Parser<unknown, Tok>, ...Parser<unknown, Tok>[]]>(
   parserList: readonly [...Ps],
 ): Parser<OneOf<Tok, [...Ps]>, Tok> {
@@ -93,13 +114,7 @@ export function oneOf<Tok, Ps extends readonly [Parser<unknown, Tok>, ...Parser<
     for (const parser of parserList) {
       const out = parser(stream) as ParseResult<OneOf<Tok, [...Ps]>, Tok>;
       if (out instanceof ParseError) {
-        if (
-          furthestError === undefined ||
-          out.position > furthestError.position ||
-          (out.position === furthestError.position && out instanceof UnexpectedEOS)
-        ) {
-          furthestError = out;
-        }
+        furthestError = furthestError === undefined ? out : mergeErrors(furthestError, out);
         continue;
       }
       return out;
@@ -228,7 +243,7 @@ export function keepRight<Tok, T>(
 
 export function eof<Tok>(stream: Stream<Tok>): ParseResult<EOS, Tok> {
   if (stream.peek() === eos) return [eos, stream];
-  return new UnexpectedInput(stream.position);
+  return new UnexpectedInput(stream.position, undefined, undefined, "eof");
 }
 
 export function sepBy1<Tok, T>(

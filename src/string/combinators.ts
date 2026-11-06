@@ -72,9 +72,9 @@ export function char<T extends string>(
     throw new Error(`'input' argument to string/char must be a single character`);
   return (stream) => {
     const val = stream.peek();
-    if (val === eos) return new UnexpectedEOS(stream.position);
+    if (val === eos) return new UnexpectedEOS(stream.position, undefined, undefined, input);
     if (caseSensitive ? val !== input : val.toLowerCase() !== input.toLowerCase())
-      return new UnexpectedInput(stream.position);
+      return new UnexpectedInput(stream.position, undefined, undefined, input);
     return [input, stream.consume()];
   };
 }
@@ -87,10 +87,10 @@ export function string<T extends string>(
     let s = stream;
     for (let i = 0; i < input.length; i++) {
       const val = s.peek();
-      if (val === eos) return new UnexpectedEOS(s.position);
+      if (val === eos) return new UnexpectedEOS(s.position, undefined, undefined, input);
       const target = input[i]!;
       if (caseSensitive ? val !== target : val.toLowerCase() !== target.toLowerCase())
-        return new UnexpectedInput(s.position);
+        return new UnexpectedInput(s.position, undefined, undefined, input);
       s = s.consume();
     }
     return [input, s];
@@ -141,6 +141,6 @@ export function satisfies(testFn: (arg: string) => boolean): Parser<string, stri
   };
 }
 
-export const digit = satisfies(isDigit);
-export const letter = satisfies(isLetter);
-export const alpha = satisfies(isAlphanum);
+export const digit = label(satisfies(isDigit), "digit");
+export const letter = label(satisfies(isLetter), "letter");
+export const alpha = label(satisfies(isAlphanum), "alphanumeric");

@@ -72,9 +72,9 @@ const createTokenFn =
   <Name extends ExtractNames<T>>(name: Name): Parser<TokenValues<T>[Name], T> => {
     return (stream) => {
       const tok = stream.peek();
-      if (tok === eos) return new UnexpectedEOS(stream.position);
+      if (tok === eos) return new UnexpectedEOS(stream.position, undefined, undefined, name);
       else if (tok[0] === name) return [tok[1] as TokenValues<T>[Name], stream.consume()];
-      else return new UnexpectedInput(stream.position);
+      else return new UnexpectedInput(stream.position, undefined, undefined, name);
     };
   };
 

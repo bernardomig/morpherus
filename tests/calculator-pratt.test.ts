@@ -273,31 +273,37 @@ describe("Calculator with pratt parser", () => {
       expect((err as UnexpectedEOS).position).toBe(4);
     }
 
-    // Invalid token after operator -> UnexpectedInput at '*'
+    // Invalid token after operator -> UnexpectedInput at '*' with merged expected tokens from atom branches
     try {
       calc("1 + * 2");
       expect.unreachable("Should have thrown UnexpectedInput");
     } catch (err) {
       expect(err).toBeInstanceOf(UnexpectedInput);
-      expect((err as UnexpectedInput).position).toBe(4);
+      const parseErr = err as UnexpectedInput;
+      expect(parseErr.position).toBe(4);
+      expect(parseErr.expected).toEqual(["sum", "max", "min", "pow", "(", "pi", "e", "digit"]);
     }
 
-    // Unclosed parenthesis -> preserves furthest error from `parens` branch at position 6
+    // Unclosed parenthesis -> preserves furthest error from `parens` branch at position 6 expecting ")"
     try {
       calc("(1 + 2");
       expect.unreachable("Should have thrown UnexpectedEOS");
     } catch (err) {
       expect(err).toBeInstanceOf(UnexpectedEOS);
-      expect((err as UnexpectedEOS).position).toBe(6);
+      const parseErr = err as UnexpectedEOS;
+      expect(parseErr.position).toBe(6);
+      expect(parseErr.expected).toEqual([")"]);
     }
 
-    // Trailing unexpected input -> UnexpectedInput at 'a'
+    // Trailing unexpected input -> UnexpectedInput at 'a' expecting "eof"
     try {
       calc("1 + 2 abc");
       expect.unreachable("Should have thrown UnexpectedInput");
     } catch (err) {
       expect(err).toBeInstanceOf(UnexpectedInput);
-      expect((err as UnexpectedInput).position).toBe(6);
+      const parseErr = err as UnexpectedInput;
+      expect(parseErr.position).toBe(6);
+      expect(parseErr.expected).toEqual(["eof"]);
     }
   });
 
@@ -315,7 +321,7 @@ describe("Calculator with pratt parser", () => {
       expect((err as ParseError).message).toBe("Expected even number, got 43");
     }
 
-    // label attaches expected label to ParseError
+    // label attaches expected label to ParseError and replaces expected when failing without progress
     const labeledNumber = label(numberLiteral, "number literal");
     try {
       runParser(labeledNumber, new StringStream("abc"));
@@ -323,6 +329,19 @@ describe("Calculator with pratt parser", () => {
     } catch (err) {
       expect(err).toBeInstanceOf(ParseError);
       expect((err as ParseError).label).toBe("number literal");
+      expect((err as ParseError).expected).toEqual(["number literal"]);
+    }
+
+    // label preserves deeper inner expected tokens when failing after consuming input
+    const labeledParens = label(between(char("("), numberLiteral, char(")")), "parenthesized number");
+    try {
+      runParser(labeledParens, new StringStream("(42"));
+      expect.unreachable("Should have failed expecting closing paren");
+    } catch (err) {
+      expect(err).toBeInstanceOf(UnexpectedEOS);
+      expect((err as ParseError).position).toBe(3);
+      expect((err as ParseError).label).toBe("parenthesized number");
+      expect((err as ParseError).expected).toEqual([")"]);
     }
 
     // endBy & endBy1: semicolon-terminated expressions

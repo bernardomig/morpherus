@@ -11,28 +11,49 @@ export function runParser<T, Tok>(parser: Parser<T, Tok>, stream: Stream<Tok>): 
   const out = parser(stream);
   if (out instanceof ParseError) throw out;
   const [value, s] = out;
-  if (s.peek() !== eos) throw new UnexpectedInput(s.position);
+  if (s.peek() !== eos) throw new UnexpectedInput(s.position, undefined, undefined, "eof");
   return value;
 }
 
 export class ParseError extends Error {
+  public expected: string[];
+
   constructor(
     public readonly position: number,
     message?: string,
     public label?: string,
+    expected: string | string[] = [],
   ) {
-    super(message);
+    const expList = Array.isArray(expected) ? [...expected] : [expected];
+    if (expList.length === 0 && label !== undefined) {
+      expList.push(label);
+    }
+    super(
+      message ??
+        (expList.length > 0 ? `Expected ${expList.join(" or ")} at position ${position}` : undefined),
+    );
+    this.expected = expList;
   }
 }
 
 export class UnexpectedEOS extends ParseError {
-  constructor(position: number, message?: string, label?: string) {
-    super(position, message, label);
+  constructor(
+    position: number,
+    message?: string,
+    label?: string,
+    expected: string | string[] = [],
+  ) {
+    super(position, message, label, expected);
   }
 }
 
 export class UnexpectedInput extends ParseError {
-  constructor(position: number, message?: string, label?: string) {
-    super(position, message, label);
+  constructor(
+    position: number,
+    message?: string,
+    label?: string,
+    expected: string | string[] = [],
+  ) {
+    super(position, message, label, expected);
   }
 }
