@@ -54,7 +54,7 @@ export function oneOf<
       if (out instanceof ParseError) continue;
       return out;
     }
-    return new UnexpectedInput();
+    return new UnexpectedInput(stream.position);
   };
 }
 
@@ -178,7 +178,7 @@ export function keepRight<Tok, T>(
 
 export function eof<Tok>(stream: Stream<Tok>): ParseResult<EOS, Tok> {
   if (stream.peek() === eos) return [eos, stream];
-  return new UnexpectedInput();
+  return new UnexpectedInput(stream.position);
 }
 
 export function sepBy1<Tok, T>(

@@ -4,15 +4,15 @@ import { eos } from "../stream";
 export class StringStream implements Stream<string> {
   constructor(
     public readonly input: string,
-    private cursor: number = 0,
+    public readonly position: number = 0,
   ) {}
 
   peek(): string | EOS {
-    const ch = this.input[this.cursor];
+    const ch = this.input[this.position];
     return ch === undefined ? eos : ch;
   }
 
   consume(): StringStream {
-    return new StringStream(this.input, this.cursor + 1);
+    return new StringStream(this.input, this.position + 1);
   }
 }

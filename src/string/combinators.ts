@@ -58,11 +58,11 @@ export function char<T extends string>(
     );
   return (stream) => {
     const val = stream.peek();
-    if (val === eos) return new UnexpectedEOS();
+    if (val === eos) return new UnexpectedEOS(stream.position);
     if (
       caseSensitive ? val !== input : val.toLowerCase() !== input.toLowerCase()
     )
-      return new UnexpectedInput();
+      return new UnexpectedInput(stream.position);
     return [input, stream.consume()];
   };
 }
@@ -75,14 +75,14 @@ export function string<T extends string>(
     let s = stream;
     for (let i = 0; i < input.length; i++) {
       const val = s.peek();
-      if (val === eos) return new UnexpectedEOS();
+      if (val === eos) return new UnexpectedEOS(s.position);
       const target = input[i]!;
       if (
         caseSensitive
           ? val !== target
           : val.toLowerCase() !== target.toLowerCase()
       )
-        return new UnexpectedInput();
+        return new UnexpectedInput(s.position);
       s = s.consume();
     }
     return [input, s];
@@ -132,9 +132,9 @@ export function satisfies(
 ): Parser<string, string> {
   return (stream) => {
     const out = stream.peek();
-    if (out === eos) return new UnexpectedEOS();
+    if (out === eos) return new UnexpectedEOS(stream.position);
     if (testFn(out)) return [out, stream.consume()];
-    return new UnexpectedInput();
+    return new UnexpectedInput(stream.position);
   };
 }
 

@@ -9,7 +9,8 @@
   },
   "type": "module",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "test": "bun test"
   },
   "devDependencies": {
     "@types/bun": "latest"

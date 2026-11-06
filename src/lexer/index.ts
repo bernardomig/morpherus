@@ -80,10 +80,10 @@ const createTokenFn =
   ): Parser<TokenValues<T>[Name], T> => {
     return (stream) => {
       const tok = stream.peek();
-      if (tok === eos) return new UnexpectedEOS();
+      if (tok === eos) return new UnexpectedEOS(stream.position);
       else if (tok[0] === name)
         return [tok[1] as TokenValues<T>[Name], stream.consume()];
-      else return new UnexpectedInput();
+      else return new UnexpectedInput(stream.position);
     };
   };
 
@@ -97,15 +97,15 @@ export function createCombinators<T extends readonly [string, unknown]>() {
 export class TokenStream<T extends [string, unknown]> implements Stream<T> {
   constructor(
     public readonly tokens: T[],
-    public cursor: number = 0,
+    public readonly position: number = 0,
   ) {}
 
   consume() {
-    return new TokenStream<T>(this.tokens, this.cursor + 1);
+    return new TokenStream<T>(this.tokens, this.position + 1);
   }
 
   peek() {
-    const value = this.tokens[this.cursor];
+    const value = this.tokens[this.position];
     if (value === undefined) return eos;
     const [n, v] = value;
     return [n, v] as T;

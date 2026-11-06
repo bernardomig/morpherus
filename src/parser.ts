@@ -15,24 +15,27 @@ export function runParser<T, Tok>(
   const out = parser(stream);
   if (out instanceof ParseError) throw out;
   const [value, s] = out;
-  if (s.peek() !== eos) throw new UnexpectedInput();
+  if (s.peek() !== eos) throw new UnexpectedInput(s.position);
   return value;
 }
 
 export class ParseError extends Error {
-  constructor(message?: string) {
+  constructor(
+    public readonly position: number,
+    message?: string,
+  ) {
     super(message);
   }
 }
 
 export class UnexpectedEOS extends ParseError {
-  constructor(message?: string) {
-    super(message);
+  constructor(position: number, message?: string) {
+    super(position, message);
   }
 }
 
 export class UnexpectedInput extends ParseError {
-  constructor(message?: string) {
-    super(message);
+  constructor(position: number, message?: string) {
+    super(position, message);
   }
 }
