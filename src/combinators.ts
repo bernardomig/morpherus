@@ -1,5 +1,6 @@
 import {
   ParseError,
+  UnexpectedEOS,
   UnexpectedInput,
   type Parser,
   type ParseResult,
@@ -54,7 +55,9 @@ export function oneOf<
       if (out instanceof ParseError) continue;
       return out;
     }
-    return new UnexpectedInput(stream.position);
+    return stream.peek() === eos
+      ? new UnexpectedEOS(stream.position)
+      : new UnexpectedInput(stream.position);
   };
 }
 
@@ -293,6 +296,45 @@ export function chainr1<Tok, T>(
   };
 }
 
+export type PrattTree<T, Op> = T | [PrattTree<T, Op>, Op, PrattTree<T, Op>];
+
+export function pratt<Tok, T, Op extends PropertyKey>(
+  value: Parser<T, Tok>,
+  operator: Parser<Op, Tok>,
+  priority: Record<Op, number>,
+): Parser<PrattTree<T, Op>, Tok> {
+  function parseExpr(
+    stream: Stream<Tok>,
+    minPriority: number,
+  ): ParseResult<PrattTree<T, Op>, Tok> {
+    const first = value(stream);
+    if (first instanceof ParseError) return first;
+
+    let lhs: PrattTree<T, Op> = first[0];
+    let s = first[1];
+
+    while (true) {
+      const opOut = operator(s);
+      if (opOut instanceof ParseError) break;
+
+      const [op, afterOp] = opOut;
+      const opPriority = priority[op];
+      if (opPriority < minPriority) break;
+
+      const rhsOut = parseExpr(afterOp, opPriority + 1);
+      if (rhsOut instanceof ParseError) return rhsOut;
+      if (rhsOut[1] === s) break;
+
+      lhs = [lhs, op, rhsOut[0]];
+      s = rhsOut[1];
+    }
+
+    return [lhs, s];
+  }
+
+  return (stream) => parseExpr(stream, -Infinity);
+}
+
 export function ref<Tok, T>(
   fn: (self: Parser<T, Tok>) => Parser<T, Tok>,
 ): Parser<T, Tok> {
@@ -366,6 +408,11 @@ export function createForToken<Tok>() {
       itemParser: Parser<T, Tok>,
       opParser: Parser<(left: T, right: T) => T, Tok>,
     ) => chainr1<Tok, T>(itemParser, opParser),
+    pratt: <T, Op extends PropertyKey>(
+      value: Parser<T, Tok>,
+      operator: Parser<Op, Tok>,
+      priority: Record<Op, number>,
+    ) => pratt<Tok, T, Op>(value, operator, priority),
     ref: <T>(fn: (self: Parser<T, Tok>) => Parser<T, Tok>) => ref<Tok, T>(fn),
   };
 }
