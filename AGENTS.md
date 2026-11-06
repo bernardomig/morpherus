@@ -70,10 +70,10 @@ export type Parser<T, Tok> = (stream: Stream<Tok>) => ParseResult<T, Tok>;
 
 ### 3. Error Hierarchy & Furthest-Error Tracking (`src/parser.ts`, `src/combinators.ts`)
 
-- `ParseError(position: number, message?: string)`
-  - `UnexpectedEOS(position: number, message?: string)`
-  - `UnexpectedInput(position: number, message?: string)`
-- All errors carry `readonly position: number` indicating the stream offset where parsing failed.
+- `ParseError(position: number, message?: string, label?: string)`
+  - `UnexpectedEOS(position: number, message?: string, label?: string)`
+  - `UnexpectedInput(position: number, message?: string, label?: string)`
+- All errors carry `readonly position: number` indicating the stream offset where parsing failed, and an optional `label?: string` populated by `label(parser, expected)`.
 - **Furthest-Error Selection in `oneOf`:** When all branches in `oneOf` fail, `oneOf` returns the `ParseError` with the largest `position` (preferring `UnexpectedEOS` on ties). This ensures deep syntax errors inside a partially matched branch (like an unclosed `(` in `(1 + 2`) are preserved rather than erased to the start of `oneOf`.
 
 ### 4. Currying Token Types via `createForToken<Tok>()` (`src/combinators.ts`)
@@ -93,6 +93,11 @@ Because TypeScript lacks partial type application, calling generic combinators d
 
 ### Core Combinators (`src/combinators.ts`)
 
+- **`pure(value)`**: Succeeds without consuming any input, returning `[value, stream]`.
+- **`fail(message?)`**: Always fails at the current stream position with `new ParseError(stream.position, message)`.
+- **`label(parser, expected)`**: Attaches `label = expected` (and formats `message`) on any `ParseError` returned by `parser`.
+- **`lookAhead(parser)`**: Runs `parser` and returns its value on success without advancing the stream (`[value, stream]`).
+- **`notFollowedBy(parser)`**: Succeeds with `[undefined, stream]` (without consuming input) only if `parser` fails; otherwise returns `UnexpectedInput(stream.position)`.
 - **`map(parser, fn)`**: Transforms the parsed value `I -> O` on success.
 - **`bind(parser, fn)`**: Monadic bind (`>>=`). Feeds the result `T` of `parser` into `fn(value)` to dynamically produce the next `Parser<U, Tok>`.
 - **`seq([...parsers])` & `ignore(parser)`**: Runs a tuple of parsers in sequence. Any parser wrapped in `ignore(...)` produces the `ignored` symbol (`Ignored`), which is filtered out at **both the TypeScript tuple type level (`Seq<Tok, Ps>`) and runtime**.
@@ -101,6 +106,7 @@ Because TypeScript lacks partial type application, calling generic combinators d
 - **`many(parser)` / `some(parser)`**: 0 or more (`T[]`) / 1 or more (`[T, ...T[]]`) repetitions.
 - **`sepBy(item, sep)` / `sepBy1(item, sep)`**: 0 or more (`T[]`) / 1 or more (`[T, ...T[]]`) items separated by `sep`.
 - **`sepEndBy(item, sep)` / `sepEndBy1(item, sep)`**: Like `sepBy` / `sepBy1`, additionally consuming an optional trailing separator.
+- **`endBy(item, sep)` / `endBy1(item, sep)`**: 0 or more (`T[]`) / 1 or more (`[T, ...T[]]`) items where every item must be terminated by `sep`.
 - **`keepOnly(parsers, index)` / `keepLeft(left, right)` / `keepRight(left, right)` / `between(left, parser, right)`**: Runs a sequence of parsers and returns only the selected element's value with exact static type inference (`ParserType<Ps[Ix]>`).
 - **`chainl1(item, op)` / `chainr1(item, op)`**: Parses 1+ occurrences of `item` separated by binary operator functions `(left: T, right: T) => T`, folding left- or right-associatively.
 - **`pratt(value, operator, priority)`**: Higher-order Pratt precedence-climbing parser. Takes an atom parser `Parser<T, Tok>`, operator parser `Parser<Op, Tok>`, and precedence map `Record<Op, number>`, returning `Parser<PrattTree<T, Op>, Tok>` where `PrattTree<T, Op> = T | [PrattTree<T, Op>, Op, PrattTree<T, Op>]` (left-associative for equal precedence).

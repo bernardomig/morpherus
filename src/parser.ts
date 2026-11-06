@@ -19,19 +19,20 @@ export class ParseError extends Error {
   constructor(
     public readonly position: number,
     message?: string,
+    public label?: string,
   ) {
     super(message);
   }
 }
 
 export class UnexpectedEOS extends ParseError {
-  constructor(position: number, message?: string) {
-    super(position, message);
+  constructor(position: number, message?: string, label?: string) {
+    super(position, message, label);
   }
 }
 
 export class UnexpectedInput extends ParseError {
-  constructor(position: number, message?: string) {
-    super(position, message);
+  constructor(position: number, message?: string, label?: string) {
+    super(position, message, label);
   }
 }

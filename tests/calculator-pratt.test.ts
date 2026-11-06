@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { eos, runParser, UnexpectedEOS, UnexpectedInput, type PrattTree } from "../src";
+import { eos, ParseError, runParser, UnexpectedEOS, UnexpectedInput, type PrattTree } from "../src";
 import {
   between,
   bind,
@@ -7,18 +7,25 @@ import {
   chainr1,
   char,
   digit,
+  endBy,
+  endBy1,
   enumOf,
   eof,
+  fail,
   ignore,
   keepLeft,
   keepOnly,
   keepRight,
+  label,
   letter,
+  lookAhead,
   many,
   map,
+  notFollowedBy,
   oneOf,
   optional,
   pratt,
+  pure,
   ref,
   sepBy,
   sepBy1,
@@ -292,5 +299,54 @@ describe("Calculator with pratt parser", () => {
       expect(err).toBeInstanceOf(UnexpectedInput);
       expect((err as UnexpectedInput).position).toBe(6);
     }
+  });
+
+  test("exercises pure, fail, label, endBy, endBy1, lookAhead, and notFollowedBy", () => {
+    // pure & fail inside bind: parse only even numbers
+    const evenNumber = bind(numberLiteral, (n) =>
+      n % 2 === 0 ? pure(n) : fail(`Expected even number, got ${n}`),
+    );
+    expect(runParser(evenNumber, new StringStream("42"))).toBe(42);
+    try {
+      runParser(evenNumber, new StringStream("43"));
+      expect.unreachable("Should have failed on odd number");
+    } catch (err) {
+      expect(err).toBeInstanceOf(ParseError);
+      expect((err as ParseError).message).toBe("Expected even number, got 43");
+    }
+
+    // label attaches expected label to ParseError
+    const labeledNumber = label(numberLiteral, "number literal");
+    try {
+      runParser(labeledNumber, new StringStream("abc"));
+      expect.unreachable("Should have failed with label");
+    } catch (err) {
+      expect(err).toBeInstanceOf(ParseError);
+      expect((err as ParseError).label).toBe("number literal");
+    }
+
+    // endBy & endBy1: semicolon-terminated expressions
+    const semi = lexeme(char(";"));
+    const exprVal = map(exprTree, evalTree);
+    const statements0 = endBy(exprVal, semi);
+    const statements1 = endBy1(exprVal, semi);
+
+    expect(runParser(statements0, new StringStream(""))).toEqual([]);
+    expect(runParser(statements0, new StringStream("1 + 1; 2 * 3;"))).toEqual([
+      2, 6,
+    ]);
+    expect(runParser(statements1, new StringStream("10 - 4;"))).toEqual([6]);
+    expect(() => runParser(statements1, new StringStream(""))).toThrow();
+
+    // lookAhead: peeks without consuming input
+    const peekPlus = seq([lookAhead(char("+")), char("+")]);
+    expect(runParser(peekPlus, new StringStream("+"))).toEqual(["+", "+"]);
+
+    // notFollowedBy: match `/` only when not followed by `/` (division vs line comment)
+    const divOp = keepLeft(char("/"), notFollowedBy(char("/")));
+    expect(runParser(divOp, new StringStream("/"))).toBe("/");
+    expect(() =>
+      runParser(seq([divOp, char("/")]), new StringStream("//")),
+    ).toThrow(UnexpectedInput);
   });
 });

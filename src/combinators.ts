@@ -8,6 +8,49 @@ import {
 } from "./parser";
 import { eos, type EOS, type Stream } from "./stream";
 
+export function pure<Tok, T>(value: T): Parser<T, Tok> {
+  return (stream) => [value, stream];
+}
+
+export function fail<Tok>(message?: string): Parser<never, Tok> {
+  return (stream) => new ParseError(stream.position, message);
+}
+
+export function label<Tok, T>(
+  parser: Parser<T, Tok>,
+  expected: string,
+): Parser<T, Tok> {
+  return (stream) => {
+    const out = parser(stream);
+    if (out instanceof ParseError) {
+      out.label = expected;
+      out.message = out.message
+        ? `${out.message} (expected ${expected})`
+        : `Expected ${expected} at position ${out.position}`;
+      return out;
+    }
+    return out;
+  };
+}
+
+export function lookAhead<Tok, T>(parser: Parser<T, Tok>): Parser<T, Tok> {
+  return (stream) => {
+    const out = parser(stream);
+    if (out instanceof ParseError) return out;
+    return [out[0], stream];
+  };
+}
+
+export function notFollowedBy<Tok>(
+  parser: Parser<unknown, Tok>,
+): Parser<undefined, Tok> {
+  return (stream) => {
+    const out = parser(stream);
+    if (out instanceof ParseError) return [undefined, stream];
+    return new UnexpectedInput(stream.position);
+  };
+}
+
 export function bind<Tok, T, U>(
   parser: Parser<T, Tok>,
   fmap: (value: T) => Parser<U, Tok>,
@@ -250,6 +293,20 @@ export function sepEndBy<Tok, T>(
   };
 }
 
+export function endBy1<Tok, T>(
+  itemParser: Parser<T, Tok>,
+  sepParser: Parser<unknown, Tok>,
+): Parser<[T, ...T[]], Tok> {
+  return some(keepLeft(itemParser, sepParser));
+}
+
+export function endBy<Tok, T>(
+  itemParser: Parser<T, Tok>,
+  sepParser: Parser<unknown, Tok>,
+): Parser<T[], Tok> {
+  return many(keepLeft(itemParser, sepParser));
+}
+
 export function chainl1<Tok, T>(
   itemParser: Parser<T, Tok>,
   opParser: Parser<(left: T, right: T) => T, Tok>,
@@ -355,6 +412,11 @@ export function between<Tok, L, T, R>(
 export function createForToken<Tok>() {
   return {
     eof: eof as Parser<EOS, Tok>,
+    pure: <T>(value: T) => pure<Tok, T>(value),
+    fail: (message?: string) => fail<Tok>(message),
+    label: <T>(parser: Parser<T, Tok>, expected: string) => label<Tok, T>(parser, expected),
+    lookAhead: <T>(parser: Parser<T, Tok>) => lookAhead<Tok, T>(parser),
+    notFollowedBy: (parser: Parser<unknown, Tok>) => notFollowedBy<Tok>(parser),
     bind: <T, U>(parser: Parser<T, Tok>, fmap: (arg: T) => Parser<U, Tok>) => bind(parser, fmap),
     ignore: <T>(parser: Parser<T, Tok>) => ignore<T, Tok>(parser),
     oneOf: <Ps extends readonly [Parser<unknown, Tok>, ...Parser<unknown, Tok>[]]>(
@@ -384,6 +446,10 @@ export function createForToken<Tok>() {
       sepEndBy<Tok, T>(itemParser, sepParser),
     sepEndBy1: <T>(itemParser: Parser<T, Tok>, sepParser: Parser<unknown, Tok>) =>
       sepEndBy1<Tok, T>(itemParser, sepParser),
+    endBy: <T>(itemParser: Parser<T, Tok>, sepParser: Parser<unknown, Tok>) =>
+      endBy<Tok, T>(itemParser, sepParser),
+    endBy1: <T>(itemParser: Parser<T, Tok>, sepParser: Parser<unknown, Tok>) =>
+      endBy1<Tok, T>(itemParser, sepParser),
     chainl1: <T>(itemParser: Parser<T, Tok>, opParser: Parser<(left: T, right: T) => T, Tok>) =>
       chainl1<Tok, T>(itemParser, opParser),
     chainr1: <T>(itemParser: Parser<T, Tok>, opParser: Parser<(left: T, right: T) => T, Tok>) =>
