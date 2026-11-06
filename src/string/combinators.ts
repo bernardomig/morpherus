@@ -55,15 +55,11 @@ export function char<T extends string>(
   { caseSensitive = true }: { caseSensitive?: boolean } = {},
 ): Parser<T, string> {
   if (input.length !== 1)
-    throw new Error(
-      `'input' argument to string/char must be a single character`,
-    );
+    throw new Error(`'input' argument to string/char must be a single character`);
   return (stream) => {
     const val = stream.peek();
     if (val === eos) return new UnexpectedEOS(stream.position);
-    if (
-      caseSensitive ? val !== input : val.toLowerCase() !== input.toLowerCase()
-    )
+    if (caseSensitive ? val !== input : val.toLowerCase() !== input.toLowerCase())
       return new UnexpectedInput(stream.position);
     return [input, stream.consume()];
   };
@@ -79,11 +75,7 @@ export function string<T extends string>(
       const val = s.peek();
       if (val === eos) return new UnexpectedEOS(s.position);
       const target = input[i]!;
-      if (
-        caseSensitive
-          ? val !== target
-          : val.toLowerCase() !== target.toLowerCase()
-      )
+      if (caseSensitive ? val !== target : val.toLowerCase() !== target.toLowerCase())
         return new UnexpectedInput(s.position);
       s = s.consume();
     }
@@ -106,10 +98,7 @@ export function enumOf<Ts extends [string, ...string[]]>(
   opts: { caseSensitive?: boolean } = {},
 ): Parser<VectorEnum<Ts>, string> {
   return oneOf(
-    values.map((x) => string(x, opts)) as [
-      Parser<string, string>,
-      ...Parser<string, string>[],
-    ],
+    values.map((x) => string(x, opts)) as [Parser<string, string>, ...Parser<string, string>[]],
   ) as Parser<VectorEnum<Ts>, string>;
 }
 
@@ -129,9 +118,7 @@ function isAlphanum(char: string): boolean {
   return isDigit(char) || isLetter(char);
 }
 
-export function satisfies(
-  testFn: (arg: string) => boolean,
-): Parser<string, string> {
+export function satisfies(testFn: (arg: string) => boolean): Parser<string, string> {
   return (stream) => {
     const out = stream.peek();
     if (out === eos) return new UnexpectedEOS(stream.position);

@@ -1,24 +1,25 @@
 {
   "name": "morpheus",
   "version": "0.1.0",
+  "type": "module",
   "types": "dist/index.d.ts",
   "exports": {
     ".": "./dist/index.js",
     "./string": "./dist/string/index.js",
     "./lexer": "./dist/lexer/index.js"
   },
-  "type": "module",
   "scripts": {
     "build": "tsc",
     "test": "bun test"
   },
+  "dependencies": {
+    "type-fest": "^5.9.0"
+  },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "oxfmt": "^0.77.0"
   },
   "peerDependencies": {
     "typescript": "^7"
-  },
-  "dependencies": {
-    "type-fest": "^5.9.0"
   }
 }

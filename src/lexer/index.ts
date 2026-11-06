@@ -7,10 +7,7 @@ export type TokenNames<T> = keyof T;
 
 type TokenType<T> = T extends { [K in keyof T]: unknown }
   ? {
-      [K in keyof T]: [
-        K,
-        T[K] extends string ? T[K] : T[K] extends RegExp ? string : never,
-      ];
+      [K in keyof T]: [K, T[K] extends string ? T[K] : T[K] extends RegExp ? string : never];
     }[keyof T]
   : never;
 
@@ -25,9 +22,7 @@ export class Lexer<T extends Record<any, string | RegExp>> {
         }
         return [name, match];
       }
-      const flags = match.flags.includes("y")
-        ? match.flags
-        : `${match.flags}y`;
+      const flags = match.flags.includes("y") ? match.flags : `${match.flags}y`;
       return [name, new RegExp(match.source, flags)];
     });
   }
@@ -56,33 +51,29 @@ export class Lexer<T extends Record<any, string | RegExp>> {
         }
       }
       if (!matched)
-        throw new Error(
-          `failed to match token: '${input.substring(cursor, cursor + 10)}'`,
-        );
+        throw new Error(`failed to match token: '${input.substring(cursor, cursor + 10)}'`);
     }
   }
 }
 
-export type TokenValues<T extends readonly [string, unknown]> =
-  UnionToIntersection<
-    T extends readonly [infer N extends string, infer V]
-      ? { [K in N]: V }
-      : never
-  >;
+export type TokenValues<T extends readonly [string, unknown]> = UnionToIntersection<
+  T extends readonly [infer N extends string, infer V] ? { [K in N]: V } : never
+>;
 
-export type ExtractNames<T extends readonly [string, unknown]> =
-  T extends readonly [infer N extends string, unknown] ? N : never;
+export type ExtractNames<T extends readonly [string, unknown]> = T extends readonly [
+  infer N extends string,
+  unknown,
+]
+  ? N
+  : never;
 
 const createTokenFn =
   <T extends readonly [string, unknown]>() =>
-  <Name extends ExtractNames<T>>(
-    name: Name,
-  ): Parser<TokenValues<T>[Name], T> => {
+  <Name extends ExtractNames<T>>(name: Name): Parser<TokenValues<T>[Name], T> => {
     return (stream) => {
       const tok = stream.peek();
       if (tok === eos) return new UnexpectedEOS(stream.position);
-      else if (tok[0] === name)
-        return [tok[1] as TokenValues<T>[Name], stream.consume()];
+      else if (tok[0] === name) return [tok[1] as TokenValues<T>[Name], stream.consume()];
       else return new UnexpectedInput(stream.position);
     };
   };

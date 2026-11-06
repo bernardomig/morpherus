@@ -32,10 +32,7 @@ export function ignore<T, Tok>(parser: Parser<T, Tok>): Parser<Ignored, Tok> {
   };
 }
 
-export type OneOf<
-  Tok,
-  Ps extends [Parser<unknown, Tok>, ...Parser<unknown, Tok>[]],
-> = Ps extends [
+export type OneOf<Tok, Ps extends [Parser<unknown, Tok>, ...Parser<unknown, Tok>[]]> = Ps extends [
   Parser<infer T, Tok>,
   infer Snd extends Parser<unknown, Tok>,
   ...infer Rest extends readonly Parser<unknown, Tok>[],
@@ -45,19 +42,31 @@ export type OneOf<
     ? T
     : never;
 
-export function oneOf<
-  Tok,
-  Ps extends readonly [Parser<unknown, Tok>, ...Parser<unknown, Tok>[]],
->(parserList: readonly [...Ps]): Parser<OneOf<Tok, [...Ps]>, Tok> {
+export function oneOf<Tok, Ps extends readonly [Parser<unknown, Tok>, ...Parser<unknown, Tok>[]]>(
+  parserList: readonly [...Ps],
+): Parser<OneOf<Tok, [...Ps]>, Tok> {
   return (stream) => {
+    let furthestError: ParseError | undefined = undefined;
     for (const parser of parserList) {
       const out = parser(stream) as ParseResult<OneOf<Tok, [...Ps]>, Tok>;
-      if (out instanceof ParseError) continue;
+      if (out instanceof ParseError) {
+        if (
+          furthestError === undefined ||
+          out.position > furthestError.position ||
+          (out.position === furthestError.position && out instanceof UnexpectedEOS)
+        ) {
+          furthestError = out;
+        }
+        continue;
+      }
       return out;
     }
-    return stream.peek() === eos
-      ? new UnexpectedEOS(stream.position)
-      : new UnexpectedInput(stream.position);
+    return (
+      furthestError ??
+      (stream.peek() === eos
+        ? new UnexpectedEOS(stream.position)
+        : new UnexpectedInput(stream.position))
+    );
   };
 }
 
@@ -87,9 +96,7 @@ export function seq<Tok, Ps extends readonly Parser<unknown, Tok>[]>(
   };
 }
 
-export function optional<Tok, T>(
-  parser: Parser<T, Tok>,
-): Parser<T | undefined, Tok> {
+export function optional<Tok, T>(parser: Parser<T, Tok>): Parser<T | undefined, Tok> {
   return (stream) => {
     const out = parser(stream);
     if (out instanceof ParseError) return [undefined, stream];
@@ -97,10 +104,7 @@ export function optional<Tok, T>(
   };
 }
 
-export function map<Tok, I, O>(
-  parser: Parser<I, Tok>,
-  mapFn: (arg: I) => O,
-): Parser<O, Tok> {
+export function map<Tok, I, O>(parser: Parser<I, Tok>, mapFn: (arg: I) => O): Parser<O, Tok> {
   return (stream) => {
     const out = parser(stream);
     if (out instanceof ParseError) return out;
@@ -303,10 +307,7 @@ export function pratt<Tok, T, Op extends PropertyKey>(
   operator: Parser<Op, Tok>,
   priority: Record<Op, number>,
 ): Parser<PrattTree<T, Op>, Tok> {
-  function parseExpr(
-    stream: Stream<Tok>,
-    minPriority: number,
-  ): ParseResult<PrattTree<T, Op>, Tok> {
+  function parseExpr(stream: Stream<Tok>, minPriority: number): ParseResult<PrattTree<T, Op>, Tok> {
     const first = value(stream);
     if (first instanceof ParseError) return first;
 
@@ -335,9 +336,7 @@ export function pratt<Tok, T, Op extends PropertyKey>(
   return (stream) => parseExpr(stream, -Infinity);
 }
 
-export function ref<Tok, T>(
-  fn: (self: Parser<T, Tok>) => Parser<T, Tok>,
-): Parser<T, Tok> {
+export function ref<Tok, T>(fn: (self: Parser<T, Tok>) => Parser<T, Tok>): Parser<T, Tok> {
   const self: Parser<T, Tok> = (stream) => {
     return parser(stream);
   };
@@ -356,26 +355,18 @@ export function between<Tok, L, T, R>(
 export function createForToken<Tok>() {
   return {
     eof: eof as Parser<EOS, Tok>,
-    bind: <T, U>(parser: Parser<T, Tok>, fmap: (arg: T) => Parser<U, Tok>) =>
-      bind(parser, fmap),
+    bind: <T, U>(parser: Parser<T, Tok>, fmap: (arg: T) => Parser<U, Tok>) => bind(parser, fmap),
     ignore: <T>(parser: Parser<T, Tok>) => ignore<T, Tok>(parser),
-    oneOf: <
-      Ps extends readonly [Parser<unknown, Tok>, ...Parser<unknown, Tok>[]],
-    >(
+    oneOf: <Ps extends readonly [Parser<unknown, Tok>, ...Parser<unknown, Tok>[]]>(
       parserList: readonly [...Ps],
     ) => oneOf<Tok, Ps>(parserList),
-    seq: <Ps extends readonly Parser<unknown, Tok>[]>(
-      parsers: readonly [...Ps],
-    ) => seq<Tok, Ps>(parsers),
+    seq: <Ps extends readonly Parser<unknown, Tok>[]>(parsers: readonly [...Ps]) =>
+      seq<Tok, Ps>(parsers),
     optional: <T>(parser: Parser<T, Tok>) => optional(parser),
-    map: <I, O>(parser: Parser<I, Tok>, mapFn: (arg: I) => O) =>
-      map<Tok, I, O>(parser, mapFn),
+    map: <I, O>(parser: Parser<I, Tok>, mapFn: (arg: I) => O) => map<Tok, I, O>(parser, mapFn),
     many: <T>(parser: Parser<T, Tok>) => many<Tok, T>(parser),
     some: <T>(parser: Parser<T, Tok>) => some<Tok, T>(parser),
-    keepOnly: <
-      Ps extends readonly Parser<unknown, Tok>[],
-      Ix extends keyof Ps & number,
-    >(
+    keepOnly: <Ps extends readonly Parser<unknown, Tok>[], Ix extends keyof Ps & number>(
       parsers: readonly [...Ps],
       ix: Ix,
     ) => keepOnly<Tok, Ps, Ix>(parsers, ix),
@@ -383,31 +374,20 @@ export function createForToken<Tok>() {
       keepLeft<Tok, T>(left, right),
     keepRight: <T>(left: Parser<unknown, Tok>, right: Parser<T, Tok>) =>
       keepRight<Tok, T>(left, right),
-    between: <L, T, R>(
-      left: Parser<L, Tok>,
-      parser: Parser<T, Tok>,
-      right: Parser<R, Tok>,
-    ) => between(left, parser, right),
+    between: <L, T, R>(left: Parser<L, Tok>, parser: Parser<T, Tok>, right: Parser<R, Tok>) =>
+      between(left, parser, right),
     sepBy: <T>(itemParser: Parser<T, Tok>, sepParser: Parser<unknown, Tok>) =>
       sepBy<Tok, T>(itemParser, sepParser),
     sepBy1: <T>(itemParser: Parser<T, Tok>, sepParser: Parser<unknown, Tok>) =>
       sepBy1<Tok, T>(itemParser, sepParser),
-    sepEndBy: <T>(
-      itemParser: Parser<T, Tok>,
-      sepParser: Parser<unknown, Tok>,
-    ) => sepEndBy<Tok, T>(itemParser, sepParser),
-    sepEndBy1: <T>(
-      itemParser: Parser<T, Tok>,
-      sepParser: Parser<unknown, Tok>,
-    ) => sepEndBy1<Tok, T>(itemParser, sepParser),
-    chainl1: <T>(
-      itemParser: Parser<T, Tok>,
-      opParser: Parser<(left: T, right: T) => T, Tok>,
-    ) => chainl1<Tok, T>(itemParser, opParser),
-    chainr1: <T>(
-      itemParser: Parser<T, Tok>,
-      opParser: Parser<(left: T, right: T) => T, Tok>,
-    ) => chainr1<Tok, T>(itemParser, opParser),
+    sepEndBy: <T>(itemParser: Parser<T, Tok>, sepParser: Parser<unknown, Tok>) =>
+      sepEndBy<Tok, T>(itemParser, sepParser),
+    sepEndBy1: <T>(itemParser: Parser<T, Tok>, sepParser: Parser<unknown, Tok>) =>
+      sepEndBy1<Tok, T>(itemParser, sepParser),
+    chainl1: <T>(itemParser: Parser<T, Tok>, opParser: Parser<(left: T, right: T) => T, Tok>) =>
+      chainl1<Tok, T>(itemParser, opParser),
+    chainr1: <T>(itemParser: Parser<T, Tok>, opParser: Parser<(left: T, right: T) => T, Tok>) =>
+      chainr1<Tok, T>(itemParser, opParser),
     pratt: <T, Op extends PropertyKey>(
       value: Parser<T, Tok>,
       operator: Parser<Op, Tok>,

@@ -23,8 +23,7 @@ import {
 } from "../src/string";
 
 /** A JSON value. */
-type JsonValue =
-  string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 // ---------------------------------------------------------------------------
 // Whitespace
@@ -35,8 +34,7 @@ const whitespace = ignore(
 );
 
 /** Parses `parser`, then consumes trailing whitespace. */
-const lexeme = <T>(parser: Parser<T>): Parser<T> =>
-  keepLeft(parser, whitespace);
+const lexeme = <T>(parser: Parser<T>): Parser<T> => keepLeft(parser, whitespace);
 
 // ---------------------------------------------------------------------------
 // Strings
@@ -62,16 +60,7 @@ const unicodeEscape = map(
 );
 
 const simpleEscape = map(
-  oneOf([
-    char('"'),
-    char("\\"),
-    char("/"),
-    char("b"),
-    char("f"),
-    char("n"),
-    char("r"),
-    char("t"),
-  ]),
+  oneOf([char('"'), char("\\"), char("/"), char("b"), char("f"), char("n"), char("r"), char("t")]),
   (c) => escapeMap[c]!,
 );
 
@@ -106,17 +95,11 @@ const nonZeroDigit = satisfies((c) => c >= "1" && c <= "9");
 // followed by any number of digits.
 const intPart = oneOf([
   char("0"),
-  map(
-    seq([nonZeroDigit, many(digit)]),
-    ([first, rest]) => first + rest.join(""),
-  ),
+  map(seq([nonZeroDigit, many(digit)]), ([first, rest]) => first + rest.join("")),
 ]);
 
 const jsonNumber: Parser<number> = map(
-  keepLeft(
-    seq([optional(char("-")), intPart, optional(fraction), optional(exponent)]),
-    whitespace,
-  ),
+  keepLeft(seq([optional(char("-")), intPart, optional(fraction), optional(exponent)]), whitespace),
   ([sign, int, frac, exp]) => {
     let text = sign ?? "";
     text += int;
@@ -148,11 +131,7 @@ const jsonValue: Parser<JsonValue> = ref((self) => {
   );
 
   const jsonObject: Parser<{ [key: string]: JsonValue }> = map(
-    between(
-      lexeme(char("{")),
-      sepBy(member, lexeme(char(","))),
-      lexeme(char("}")),
-    ),
+    between(lexeme(char("{")), sepBy(member, lexeme(char(","))), lexeme(char("}"))),
     (entries) => Object.fromEntries(entries),
   );
 
@@ -162,14 +141,7 @@ const jsonValue: Parser<JsonValue> = ref((self) => {
     lexeme(char("]")),
   );
 
-  return oneOf([
-    jsonObject,
-    jsonArray,
-    jsonString,
-    jsonNumber,
-    jsonBoolean,
-    jsonNull,
-  ]);
+  return oneOf([jsonObject, jsonArray, jsonString, jsonNumber, jsonBoolean, jsonNull]);
 });
 
 /** A complete JSON document. */
@@ -215,16 +187,7 @@ describe("JSON parser", () => {
   });
 
   test("rejects invalid input", () => {
-    for (const input of [
-      "",
-      "{",
-      "[1 2]",
-      '"unterminated',
-      "tru",
-      "01",
-      '{"a":}',
-      "[1, 2, 3,]",
-    ]) {
+    for (const input of ["", "{", "[1 2]", '"unterminated', "tru", "01", '{"a":}', "[1, 2, 3,]"]) {
       expect(() => parseJson(input)).toThrow();
     }
   });

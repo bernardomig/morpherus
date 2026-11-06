@@ -1,11 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  eos,
-  runParser,
-  UnexpectedEOS,
-  UnexpectedInput,
-  type PrattTree,
-} from "../src";
+import { eos, runParser, UnexpectedEOS, UnexpectedInput, type PrattTree } from "../src";
 import {
   between,
   bind,
@@ -64,11 +58,7 @@ const priority: Record<Op, number> = {
 // Number literal: optional '-', integer digits, optional fractional part
 const numberLiteral: Parser<number> = lexeme(
   map(
-    seq([
-      optional(char("-")),
-      some(digit),
-      optional(seq([char("."), some(digit)])),
-    ]),
+    seq([optional(char("-")), some(digit), optional(seq([char("."), some(digit)]))]),
     ([sign, intDigits, fracPart]) => {
       const intStr = intDigits.join("");
       const fracStr = fracPart ? `.${fracPart[1].join("")}` : "";
@@ -112,11 +102,7 @@ const exprTree: Parser<PrattTree<number, Op>> = ref((self) => {
   const evalSelf: Parser<number> = map(self, evalTree);
 
   // Parenthesized expression: ( expr )
-  const parens: Parser<number> = between(
-    lexeme(char("(")),
-    evalSelf,
-    lexeme(char(")")),
-  );
+  const parens: Parser<number> = between(lexeme(char("(")), evalSelf, lexeme(char(")")));
 
   // Built-in function calls using `bind`, `sepEndBy`, `sepBy1`, `sepBy`
   const funcName = lexeme(enumOf(["sum", "max", "min", "pow"]));
@@ -133,15 +119,11 @@ const exprTree: Parser<PrattTree<number, Op>> = ref((self) => {
     }
     if (fn === "max") {
       // Requires 1 or more arguments with optional trailing comma (sepEndBy1)
-      return map(between(lparen, sepEndBy1(evalSelf, comma), rparen), (args) =>
-        Math.max(...args),
-      );
+      return map(between(lparen, sepEndBy1(evalSelf, comma), rparen), (args) => Math.max(...args));
     }
     if (fn === "min") {
       // Requires 1 or more arguments without trailing comma (sepBy1)
-      return map(between(lparen, sepBy1(evalSelf, comma), rparen), (args) =>
-        Math.min(...args),
-      );
+      return map(between(lparen, sepBy1(evalSelf, comma), rparen), (args) => Math.min(...args));
     }
     // pow(base, exp) using `seq` and `ignore`
     return map(
@@ -150,12 +132,7 @@ const exprTree: Parser<PrattTree<number, Op>> = ref((self) => {
     );
   });
 
-  const atom: Parser<number> = oneOf([
-    funcCall,
-    parens,
-    constantLiteral,
-    numberLiteral,
-  ]);
+  const atom: Parser<number> = oneOf([funcCall, parens, constantLiteral, numberLiteral]);
 
   return pratt(atom, operator, priority);
 });
@@ -191,11 +168,7 @@ describe("Calculator with pratt parser", () => {
     expect(calc("2 * 3 + 4")).toBe(10);
 
     // 2 * 3 ^ 2 + 1 => [[2, "*", [3, "^", 2]], "+", 1]
-    expect(parseTree("2 * 3 ^ 2 + 1")).toEqual([
-      [2, "*", [3, "^", 2]],
-      "+",
-      1,
-    ]);
+    expect(parseTree("2 * 3 ^ 2 + 1")).toEqual([[2, "*", [3, "^", 2]], "+", 1]);
     expect(calc("2 * 3 ^ 2 + 1")).toBe(19);
   });
 
@@ -209,11 +182,7 @@ describe("Calculator with pratt parser", () => {
     expect(calc("24 / 6 / 2")).toBe(2);
 
     // 1 + 2 - 3 + 4 => [[[1, "+", 2], "-", 3], "+", 4] = 4
-    expect(parseTree("1 + 2 - 3 + 4")).toEqual([
-      [[1, "+", 2], "-", 3],
-      "+",
-      4,
-    ]);
+    expect(parseTree("1 + 2 - 3 + 4")).toEqual([[[1, "+", 2], "-", 3], "+", 4]);
     expect(calc("1 + 2 - 3 + 4")).toBe(4);
   });
 
@@ -246,13 +215,8 @@ describe("Calculator with pratt parser", () => {
   });
 
   test("compares chainl1 and chainr1 associativity", () => {
-    const num = lexeme(
-      map(some(digit), (digits) => Number(digits.join(""))),
-    );
-    const powOp = map(
-      lexeme(char("^")),
-      () => (l: number, r: number) => l ** r,
-    );
+    const num = lexeme(map(some(digit), (digits) => Number(digits.join(""))));
+    const powOp = map(lexeme(char("^")), () => (l: number, r: number) => l ** r);
 
     const leftPow = chainl1(num, powOp);
     const rightPow = chainr1(num, powOp);
@@ -277,9 +241,7 @@ describe("Calculator with pratt parser", () => {
       3,
     );
 
-    expect(runParser(assignment, new StringStream("let answer = 6 * 7;"))).toBe(
-      42,
-    );
+    expect(runParser(assignment, new StringStream("let answer = 6 * 7;"))).toBe(42);
 
     // Comma-separated list of expressions (0 or more) via sepBy
     const listParser = between(
@@ -288,9 +250,7 @@ describe("Calculator with pratt parser", () => {
       lexeme(char("]")),
     );
     expect(runParser(listParser, new StringStream("[]"))).toEqual([]);
-    expect(runParser(listParser, new StringStream("[1 + 1, 2 * 3]"))).toEqual([
-      2, 6,
-    ]);
+    expect(runParser(listParser, new StringStream("[1 + 1, 2 * 3]"))).toEqual([2, 6]);
 
     // Direct eof result check
     expect(runParser(eof, new StringStream(""))).toBe(eos);
@@ -315,13 +275,13 @@ describe("Calculator with pratt parser", () => {
       expect((err as UnexpectedInput).position).toBe(4);
     }
 
-    // Unclosed parenthesis -> fails at position 0 because `oneOf` backtracks all atom branches
+    // Unclosed parenthesis -> preserves furthest error from `parens` branch at position 6
     try {
       calc("(1 + 2");
-      expect.unreachable("Should have thrown UnexpectedInput");
+      expect.unreachable("Should have thrown UnexpectedEOS");
     } catch (err) {
-      expect(err).toBeInstanceOf(UnexpectedInput);
-      expect((err as UnexpectedInput).position).toBe(0);
+      expect(err).toBeInstanceOf(UnexpectedEOS);
+      expect((err as UnexpectedEOS).position).toBe(6);
     }
 
     // Trailing unexpected input -> UnexpectedInput at 'a'

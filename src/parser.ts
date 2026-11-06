@@ -4,14 +4,10 @@ export type ParseResult<T, Tok> = [T, Stream<Tok>] | ParseError;
 export type Parser<T, Tok> = (stream: Stream<Tok>) => ParseResult<T, Tok>;
 
 // Utility types
-export type ParserType<P extends Parser<any, any>> =
-  P extends Parser<infer T, any> ? T : never;
+export type ParserType<P extends Parser<any, any>> = P extends Parser<infer T, any> ? T : never;
 
 // run parser
-export function runParser<T, Tok>(
-  parser: Parser<T, Tok>,
-  stream: Stream<Tok>,
-): T {
+export function runParser<T, Tok>(parser: Parser<T, Tok>, stream: Stream<Tok>): T {
   const out = parser(stream);
   if (out instanceof ParseError) throw out;
   const [value, s] = out;
