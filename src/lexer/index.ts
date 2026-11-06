@@ -15,25 +15,39 @@ type TokenType<T> = T extends { [K in keyof T]: unknown }
   : never;
 
 export class Lexer<T extends Record<any, string | RegExp>> {
-  constructor(public readonly def: T) {}
+  private readonly rules: Array<[string, string | RegExp]>;
+
+  constructor(public readonly def: T) {
+    this.rules = Object.entries(def).map(([name, match]) => {
+      if (typeof match === "string") {
+        if (match.length === 0) {
+          throw new Error(`Lexer rule '${name}' cannot be an empty string`);
+        }
+        return [name, match];
+      }
+      const flags = match.flags.includes("y")
+        ? match.flags
+        : `${match.flags}y`;
+      return [name, new RegExp(match.source, flags)];
+    });
+  }
 
   *tokenize(input: string): Iterable<TokenType<T>> {
     let cursor = 0;
     while (cursor < input.length) {
       let matched = false;
-      for (const [name, match] of Object.entries(this.def)) {
+      for (const [name, match] of this.rules) {
         if (typeof match === "string") {
-          if (match === input.substring(cursor, cursor + match.length)) {
+          if (input.startsWith(match, cursor)) {
             yield [name, match] as TokenType<T>;
             cursor += match.length;
             matched = true;
             break;
-          } else continue;
-        } else if (match instanceof RegExp) {
-          const r = new RegExp(match, "y");
-          r.lastIndex = cursor;
-          const m = input.match(r);
-          if (m !== null) {
+          }
+        } else {
+          match.lastIndex = cursor;
+          const m = match.exec(input);
+          if (m !== null && m[0].length > 0) {
             yield [name, m[0]] as TokenType<T>;
             cursor += m[0].length;
             matched = true;
@@ -93,7 +107,7 @@ export class TokenStream<T extends [string, unknown]> implements Stream<T> {
   peek() {
     const value = this.tokens[this.cursor];
     if (value === undefined) return eos;
-    const [n, v, _] = value;
+    const [n, v] = value;
     return [n, v] as T;
   }
 }

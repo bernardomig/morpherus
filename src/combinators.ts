@@ -3,7 +3,9 @@ import {
   UnexpectedInput,
   type Parser,
   type ParseResult,
+  type ParserType,
 } from "./parser";
+import { eos, type EOS, type Stream } from "./stream";
 
 export function bind<Tok, T, U>(
   parser: Parser<T, Tok>,
@@ -110,6 +112,7 @@ export function many<Tok, T>(parser: Parser<T, Tok>): Parser<T[], Tok> {
     let s = stream;
     let out = parser(s);
     while (!(out instanceof ParseError)) {
+      if (out[1] === s) break;
       const value = out[0];
       s = out[1];
       outputs.push(value);
@@ -125,8 +128,10 @@ export function some<Tok, T>(parser: Parser<T, Tok>): Parser<[T, ...T[]], Tok> {
     if (first instanceof ParseError) return first;
     const outputs: T[] = [];
     let s = first[1];
+    if (s === stream) return [[first[0]], s];
     let out = parser(s);
     while (!(out instanceof ParseError)) {
+      if (out[1] === s) break;
       const value = out[0];
       s = out[1];
       outputs.push(value);
@@ -136,25 +141,24 @@ export function some<Tok, T>(parser: Parser<T, Tok>): Parser<[T, ...T[]], Tok> {
   };
 }
 
-type ParseType<P> = P extends Parser<infer T, any> ? T : never;
-
 export function keepOnly<
   Tok,
   Ps extends readonly Parser<unknown, Tok>[],
   Ix extends keyof Ps & number,
->(parsers: readonly [...Ps], ix: Ix): Parser<ParseType<Ps[Ix]>, Tok> {
+>(parsers: readonly [...Ps], ix: Ix): Parser<ParserType<Ps[Ix]>, Tok> {
   return (stream) => {
     let s = stream;
     let result: unknown = undefined;
 
     for (let i = 0; i < parsers.length; i++) {
-      const out = parsers[i](s);
+      const p = parsers[i]!;
+      const out = p(s);
       if (out instanceof ParseError) return out;
       if (i === ix) result = out[0];
       s = out[1];
     }
 
-    return [result as ParseType<Ps[Ix]>, s];
+    return [result as ParserType<Ps[Ix]>, s];
   };
 }
 
@@ -172,7 +176,12 @@ export function keepRight<Tok, T>(
   return keepOnly([left, right], 1);
 }
 
-export function sepBy<Tok, T>(
+export function eof<Tok>(stream: Stream<Tok>): ParseResult<EOS, Tok> {
+  if (stream.peek() === eos) return [eos, stream];
+  return new UnexpectedInput();
+}
+
+export function sepBy1<Tok, T>(
   itemParser: Parser<T, Tok>,
   sepParser: Parser<unknown, Tok>,
 ): Parser<[T, ...T[]], Tok> {
@@ -184,6 +193,7 @@ export function sepBy<Tok, T>(
     let s = first[1];
     let out = restP(s);
     while (!(out instanceof ParseError)) {
+      if (out[1] === s) break;
       const value = out[0];
       s = out[1];
       rest.push(value);
@@ -193,13 +203,104 @@ export function sepBy<Tok, T>(
   };
 }
 
+export function sepBy<Tok, T>(
+  itemParser: Parser<T, Tok>,
+  sepParser: Parser<unknown, Tok>,
+): Parser<T[], Tok> {
+  const nonEmpty = sepBy1(itemParser, sepParser);
+  return (stream) => {
+    const out = nonEmpty(stream);
+    if (out instanceof ParseError) return [[], stream];
+    return out;
+  };
+}
+
+export function sepEndBy1<Tok, T>(
+  itemParser: Parser<T, Tok>,
+  sepParser: Parser<unknown, Tok>,
+): Parser<[T, ...T[]], Tok> {
+  const itemsP = sepBy1(itemParser, sepParser);
+  const trailingSep = optional(sepParser);
+  return (stream) => {
+    const out = itemsP(stream);
+    if (out instanceof ParseError) return out;
+    const [items, s] = out;
+    const afterSep = trailingSep(s);
+    if (afterSep instanceof ParseError) return [items, s];
+    return [items, afterSep[1]];
+  };
+}
+
+export function sepEndBy<Tok, T>(
+  itemParser: Parser<T, Tok>,
+  sepParser: Parser<unknown, Tok>,
+): Parser<T[], Tok> {
+  const nonEmpty = sepEndBy1(itemParser, sepParser);
+  return (stream) => {
+    const out = nonEmpty(stream);
+    if (out instanceof ParseError) return [[], stream];
+    return out;
+  };
+}
+
+export function chainl1<Tok, T>(
+  itemParser: Parser<T, Tok>,
+  opParser: Parser<(left: T, right: T) => T, Tok>,
+): Parser<T, Tok> {
+  return (stream) => {
+    const first = itemParser(stream);
+    if (first instanceof ParseError) return first;
+    let acc = first[0];
+    let s = first[1];
+    while (true) {
+      const opOut = opParser(s);
+      if (opOut instanceof ParseError) break;
+      const rhsOut = itemParser(opOut[1]);
+      if (rhsOut instanceof ParseError) break;
+      if (rhsOut[1] === s) break;
+      acc = opOut[0](acc, rhsOut[0]);
+      s = rhsOut[1];
+    }
+    return [acc, s];
+  };
+}
+
+export function chainr1<Tok, T>(
+  itemParser: Parser<T, Tok>,
+  opParser: Parser<(left: T, right: T) => T, Tok>,
+): Parser<T, Tok> {
+  return (stream) => {
+    const first = itemParser(stream);
+    if (first instanceof ParseError) return first;
+    const ops: Array<[(left: T, right: T) => T, T]> = [];
+    let s = first[1];
+    while (true) {
+      const opOut = opParser(s);
+      if (opOut instanceof ParseError) break;
+      const rhsOut = itemParser(opOut[1]);
+      if (rhsOut instanceof ParseError) break;
+      if (rhsOut[1] === s) break;
+      ops.push([opOut[0], rhsOut[0]]);
+      s = rhsOut[1];
+    }
+    if (ops.length === 0) return [first[0], s];
+    let acc = ops[ops.length - 1]![1];
+    for (let i = ops.length - 1; i >= 1; i--) {
+      acc = ops[i]![0](ops[i - 1]![1], acc);
+    }
+    acc = ops[0]![0](first[0], acc);
+    return [acc, s];
+  };
+}
+
 export function ref<Tok, T>(
   fn: (self: Parser<T, Tok>) => Parser<T, Tok>,
 ): Parser<T, Tok> {
   const self: Parser<T, Tok> = (stream) => {
-    return fn(self)(stream);
+    return parser(stream);
   };
-  return fn(self);
+  const parser = fn(self);
+  return parser;
 }
 
 export function between<Tok, L, T, R>(
@@ -212,6 +313,7 @@ export function between<Tok, L, T, R>(
 
 export function createForToken<Tok>() {
   return {
+    eof: eof as Parser<EOS, Tok>,
     bind: <T, U>(parser: Parser<T, Tok>, fmap: (arg: T) => Parser<U, Tok>) =>
       bind(parser, fmap),
     ignore: <T>(parser: Parser<T, Tok>) => ignore<T, Tok>(parser),
@@ -239,13 +341,31 @@ export function createForToken<Tok>() {
       keepLeft<Tok, T>(left, right),
     keepRight: <T>(left: Parser<unknown, Tok>, right: Parser<T, Tok>) =>
       keepRight<Tok, T>(left, right),
-    between: <L, R, T>(
+    between: <L, T, R>(
       left: Parser<L, Tok>,
       parser: Parser<T, Tok>,
       right: Parser<R, Tok>,
     ) => between(left, parser, right),
     sepBy: <T>(itemParser: Parser<T, Tok>, sepParser: Parser<unknown, Tok>) =>
       sepBy<Tok, T>(itemParser, sepParser),
+    sepBy1: <T>(itemParser: Parser<T, Tok>, sepParser: Parser<unknown, Tok>) =>
+      sepBy1<Tok, T>(itemParser, sepParser),
+    sepEndBy: <T>(
+      itemParser: Parser<T, Tok>,
+      sepParser: Parser<unknown, Tok>,
+    ) => sepEndBy<Tok, T>(itemParser, sepParser),
+    sepEndBy1: <T>(
+      itemParser: Parser<T, Tok>,
+      sepParser: Parser<unknown, Tok>,
+    ) => sepEndBy1<Tok, T>(itemParser, sepParser),
+    chainl1: <T>(
+      itemParser: Parser<T, Tok>,
+      opParser: Parser<(left: T, right: T) => T, Tok>,
+    ) => chainl1<Tok, T>(itemParser, opParser),
+    chainr1: <T>(
+      itemParser: Parser<T, Tok>,
+      opParser: Parser<(left: T, right: T) => T, Tok>,
+    ) => chainr1<Tok, T>(itemParser, opParser),
     ref: <T>(fn: (self: Parser<T, Tok>) => Parser<T, Tok>) => ref<Tok, T>(fn),
   };
 }

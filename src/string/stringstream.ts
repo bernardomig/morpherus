@@ -7,14 +7,12 @@ export class StringStream implements Stream<string> {
     private cursor: number = 0,
   ) {}
 
-  peek(n: number = 1): string | EOS {
-    if (!(this.cursor + n <= this.input.length)) {
-      return eos;
-    }
-    return this.input.slice(this.cursor, this.cursor + n);
+  peek(): string | EOS {
+    const ch = this.input[this.cursor];
+    return ch === undefined ? eos : ch;
   }
 
-  consume(n: number = 1): StringStream {
-    return new StringStream(this.input, this.cursor + n);
+  consume(): StringStream {
+    return new StringStream(this.input, this.cursor + 1);
   }
 }

@@ -5,6 +5,9 @@ import { eos } from "../stream";
 const {
   between,
   bind,
+  chainl1,
+  chainr1,
+  eof,
   ignore,
   keepLeft,
   keepOnly,
@@ -15,6 +18,9 @@ const {
   optional,
   ref,
   sepBy,
+  sepBy1,
+  sepEndBy,
+  sepEndBy1,
   seq,
   some,
 } = createForToken<string>();
@@ -22,6 +28,9 @@ const {
 export {
   between,
   bind,
+  chainl1,
+  chainr1,
+  eof,
   ignore,
   keepLeft,
   keepOnly,
@@ -32,6 +41,9 @@ export {
   optional,
   ref,
   sepBy,
+  sepBy1,
+  sepEndBy,
+  sepEndBy1,
   seq,
   some,
 };
@@ -60,13 +72,20 @@ export function string<T extends string>(
   { caseSensitive = true }: { caseSensitive?: boolean } = {},
 ): Parser<T, string> {
   return (stream) => {
-    const val = stream.peek(input.length);
-    if (val === eos) return new UnexpectedEOS();
-    if (
-      caseSensitive ? val !== input : val.toLowerCase() !== input.toLowerCase()
-    )
-      return new UnexpectedInput();
-    return [input, stream.consume(input.length)];
+    let s = stream;
+    for (let i = 0; i < input.length; i++) {
+      const val = s.peek();
+      if (val === eos) return new UnexpectedEOS();
+      const target = input[i]!;
+      if (
+        caseSensitive
+          ? val !== target
+          : val.toLowerCase() !== target.toLowerCase()
+      )
+        return new UnexpectedInput();
+      s = s.consume();
+    }
+    return [input, s];
   };
 }
 
