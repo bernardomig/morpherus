@@ -13,7 +13,8 @@
   ],
   "scripts": {
     "build": "tsc",
-    "test": "bun test"
+    "test": "bun test",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json -p tsconfig.json"
   },
   "dependencies": {
     "type-fest": "^5.9.0"

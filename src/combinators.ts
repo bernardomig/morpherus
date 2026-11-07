@@ -5,6 +5,7 @@ import {
   type Parser,
   type ParseResult,
   type ParserType,
+  type TokenOf,
 } from "./parser";
 import { eos, type EOS, type Stream } from "./stream";
 
@@ -71,13 +72,13 @@ export function ignore<T, Tok>(parser: Parser<T, Tok>): Parser<Ignored, Tok> {
   };
 }
 
-export type OneOf<Tok, Ps extends [Parser<unknown, Tok>, ...Parser<unknown, Tok>[]]> = Ps extends [
-  Parser<infer T, Tok>,
-  infer Snd extends Parser<unknown, Tok>,
-  ...infer Rest extends readonly Parser<unknown, Tok>[],
+export type OneOf<Tok, Ps extends readonly [Parser<any, any>, ...Parser<any, any>[]]> = Ps extends [
+  Parser<infer T, any>,
+  infer Snd extends Parser<any, any>,
+  ...infer Rest extends readonly Parser<any, any>[],
 ]
   ? T | OneOf<Tok, [Snd, ...Rest]>
-  : Ps extends readonly [Parser<infer T, Tok>]
+  : Ps extends readonly [Parser<infer T, any>]
     ? T
     : never;
 
@@ -101,9 +102,10 @@ function mergeErrors(a: ParseError, b: ParseError): ParseError {
   return new ParseError(a.position, message, label, mergedExpected);
 }
 
-export function oneOf<Tok, Ps extends readonly [Parser<unknown, Tok>, ...Parser<unknown, Tok>[]]>(
-  parserList: readonly [...Ps],
-): Parser<OneOf<Tok, [...Ps]>, Tok> {
+export function oneOf<
+  Ps extends readonly [Parser<any, any>, ...Parser<any, any>[]],
+  Tok = TokenOf<Ps[number]>,
+>(parserList: readonly [...Ps]): Parser<OneOf<Tok, [...Ps]>, Tok> {
   return (stream) => {
     let furthestError: ParseError | undefined = undefined;
     for (const parser of parserList) {
@@ -123,18 +125,19 @@ export function oneOf<Tok, Ps extends readonly [Parser<unknown, Tok>, ...Parser<
   };
 }
 
-export type Seq<Tok, Ps extends readonly Parser<unknown, Tok>[]> = Ps extends [
-  Parser<infer T, Tok>,
-  ...infer Rest extends Parser<unknown, Tok>[],
+export type Seq<Tok, Ps extends readonly Parser<any, any>[]> = Ps extends [
+  Parser<infer T, any>,
+  ...infer Rest extends Parser<any, any>[],
 ]
   ? T extends Ignored
     ? Seq<Tok, Rest>
     : [T, ...Seq<Tok, Rest>]
   : [];
 
-export function seq<Tok, Ps extends readonly Parser<unknown, Tok>[]>(
-  parsers: readonly [...Ps],
-): Parser<Seq<Tok, Ps>, Tok> {
+export function seq<
+  Ps extends readonly Parser<any, any>[],
+  Tok = TokenOf<Ps[number]>,
+>(parsers: readonly [...Ps]): Parser<Seq<Tok, Ps>, Tok> {
   return (stream) => {
     const outs: any[] = [];
     let s = stream;
@@ -202,9 +205,9 @@ export function some<Tok, T>(parser: Parser<T, Tok>): Parser<[T, ...T[]], Tok> {
 }
 
 export function keepOnly<
-  Tok,
-  Ps extends readonly Parser<unknown, Tok>[],
+  Ps extends readonly Parser<any, any>[],
   Ix extends keyof Ps & number,
+  Tok = TokenOf<Ps[number]>,
 >(parsers: readonly [...Ps], ix: Ix): Parser<ParserType<Ps[Ix]>, Tok> {
   return (stream) => {
     let s = stream;
@@ -434,9 +437,10 @@ export function createForToken<Tok>() {
     ignore: <T>(parser: Parser<T, Tok>) => ignore<T, Tok>(parser),
     oneOf: <Ps extends readonly [Parser<unknown, Tok>, ...Parser<unknown, Tok>[]]>(
       parserList: readonly [...Ps],
-    ) => oneOf<Tok, Ps>(parserList),
-    seq: <Ps extends readonly Parser<unknown, Tok>[]>(parsers: readonly [...Ps]) =>
-      seq<Tok, Ps>(parsers),
+    ): Parser<OneOf<Tok, [...Ps]>, Tok> => oneOf(parserList),
+    seq: <Ps extends readonly Parser<unknown, Tok>[]>(
+      parsers: readonly [...Ps],
+    ): Parser<Seq<Tok, Ps>, Tok> => seq(parsers),
     optional: <T>(parser: Parser<T, Tok>) => optional(parser),
     map: <I, O>(parser: Parser<I, Tok>, mapFn: (arg: I) => O) => map<Tok, I, O>(parser, mapFn),
     many: <T>(parser: Parser<T, Tok>) => many<Tok, T>(parser),
@@ -444,7 +448,7 @@ export function createForToken<Tok>() {
     keepOnly: <Ps extends readonly Parser<unknown, Tok>[], Ix extends keyof Ps & number>(
       parsers: readonly [...Ps],
       ix: Ix,
-    ) => keepOnly<Tok, Ps, Ix>(parsers, ix),
+    ): Parser<ParserType<Ps[Ix]>, Tok> => keepOnly(parsers, ix),
     keepLeft: <T>(left: Parser<T, Tok>, right: Parser<unknown, Tok>) =>
       keepLeft<Tok, T>(left, right),
     keepRight: <T>(left: Parser<unknown, Tok>, right: Parser<T, Tok>) =>

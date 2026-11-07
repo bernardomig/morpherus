@@ -7,6 +7,7 @@ export type Parser<T, Tok> = (stream: Stream<Tok, any>) => ParseResult<T, Tok>;
 
 // Utility types
 export type ParserType<P extends Parser<any, any>> = P extends Parser<infer T, any> ? T : never;
+export type TokenOf<P extends Parser<any, any>> = P extends Parser<any, infer Tok> ? Tok : never;
 
 // run parser
 export function runParser<T, Tok>(parser: Parser<T, Tok>, stream: Stream<Tok, any>): T {
