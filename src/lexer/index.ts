@@ -7,7 +7,10 @@ export type TokenNames<T> = keyof T;
 
 type TokenType<T> = T extends { [K in keyof T]: unknown }
   ? {
-      [K in keyof T]: [K, T[K] extends string ? T[K] : T[K] extends RegExp ? string : never];
+      [K in keyof T]: [
+        K,
+        T[K] extends string ? T[K] : T[K] extends RegExp ? string : never,
+      ];
     }[keyof T]
   : never;
 
@@ -51,30 +54,36 @@ export class Lexer<T extends Record<any, string | RegExp>> {
         }
       }
       if (!matched)
-        throw new Error(`failed to match token: '${input.substring(cursor, cursor + 10)}'`);
+        throw new Error(
+          `failed to match token: '${input.substring(cursor, cursor + 10)}'`,
+        );
     }
   }
 }
 
-export type TokenValues<T extends readonly [string, unknown]> = UnionToIntersection<
-  T extends readonly [infer N extends string, infer V] ? { [K in N]: V } : never
->;
+export type TokenValues<T extends readonly [string, unknown]> =
+  UnionToIntersection<
+    T extends readonly [infer N extends string, infer V]
+      ? { [K in N]: V }
+      : never
+  >;
 
-export type ExtractNames<T extends readonly [string, unknown]> = T extends readonly [
-  infer N extends string,
-  unknown,
-]
-  ? N
-  : never;
+export type ExtractNames<T extends readonly [string, unknown]> =
+  T extends readonly [infer N extends string, unknown] ? N : never;
 
 const createTokenFn =
   <T extends readonly [string, unknown]>() =>
-  <Name extends ExtractNames<T>>(name: Name): Parser<TokenValues<T>[Name], T> => {
+  <Name extends ExtractNames<T>>(
+    name: Name,
+  ): Parser<TokenValues<T>[Name], T> => {
     return (stream) => {
       const tok = stream.peek();
-      if (tok === eos) return new UnexpectedEOS(stream.position, undefined, undefined, name);
-      else if (tok[0] === name) return [tok[1] as TokenValues<T>[Name], stream.consume()];
-      else return new UnexpectedInput(stream.position, undefined, undefined, name);
+      if (tok === eos)
+        return new UnexpectedEOS(stream.position, undefined, undefined, name);
+      else if (tok[0] === name)
+        return [tok[1] as TokenValues<T>[Name], stream.consume()];
+      else
+        return new UnexpectedInput(stream.position, undefined, undefined, name);
     };
   };
 
@@ -85,7 +94,10 @@ export function createCombinators<T extends readonly [string, unknown]>() {
   };
 }
 
-export class TokenStream<T extends [string, unknown]> implements Stream<T, T[]> {
+export class TokenStream<T extends [string, unknown]> implements Stream<
+  T,
+  T[]
+> {
   constructor(
     public readonly tokens: T[],
     public readonly position: number = 0,
@@ -97,8 +109,7 @@ export class TokenStream<T extends [string, unknown]> implements Stream<T, T[]> 
     if (n === 1) {
       const value = this.tokens[this.position];
       if (value === undefined) return eos;
-      const [name, v] = value;
-      return [name, v] as T;
+      return value;
     }
     if (this.position + n > this.tokens.length) return eos;
     return this.tokens.slice(this.position, this.position + n);
