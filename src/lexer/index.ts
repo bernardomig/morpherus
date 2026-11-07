@@ -85,7 +85,7 @@ export function createCombinators<T extends readonly [string, unknown]>() {
   };
 }
 
-export class TokenStream<T extends [string, unknown]> implements Stream<T> {
+export class TokenStream<T extends [string, unknown]> implements Stream<T, T[]> {
   constructor(
     public readonly tokens: T[],
     public readonly position: number = 0,

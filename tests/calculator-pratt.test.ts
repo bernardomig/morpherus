@@ -333,7 +333,10 @@ describe("Calculator with pratt parser", () => {
     }
 
     // label preserves deeper inner expected tokens when failing after consuming input
-    const labeledParens = label(between(char("("), numberLiteral, char(")")), "parenthesized number");
+    const labeledParens = label(
+      between(char("("), numberLiteral, char(")")),
+      "parenthesized number",
+    );
     try {
       runParser(labeledParens, new StringStream("(42"));
       expect.unreachable("Should have failed expecting closing paren");
@@ -351,9 +354,7 @@ describe("Calculator with pratt parser", () => {
     const statements1 = endBy1(exprVal, semi);
 
     expect(runParser(statements0, new StringStream(""))).toEqual([]);
-    expect(runParser(statements0, new StringStream("1 + 1; 2 * 3;"))).toEqual([
-      2, 6,
-    ]);
+    expect(runParser(statements0, new StringStream("1 + 1; 2 * 3;"))).toEqual([2, 6]);
     expect(runParser(statements1, new StringStream("10 - 4;"))).toEqual([6]);
     expect(() => runParser(statements1, new StringStream(""))).toThrow();
 
@@ -364,8 +365,8 @@ describe("Calculator with pratt parser", () => {
     // notFollowedBy: match `/` only when not followed by `/` (division vs line comment)
     const divOp = keepLeft(char("/"), notFollowedBy(char("/")));
     expect(runParser(divOp, new StringStream("/"))).toBe("/");
-    expect(() =>
-      runParser(seq([divOp, char("/")]), new StringStream("//")),
-    ).toThrow(UnexpectedInput);
+    expect(() => runParser(seq([divOp, char("/")]), new StringStream("//"))).toThrow(
+      UnexpectedInput,
+    );
   });
 });

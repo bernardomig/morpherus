@@ -44,7 +44,7 @@ Every input source implements `Stream<T>`:
 export const eos: unique symbol = Symbol();
 export type EOS = typeof eos;
 
-export interface Stream<T, C = T[]> {
+export interface Stream<T, C> {
   readonly position: number;
   peek(): T | EOS;
   peek(n: number): C | EOS;

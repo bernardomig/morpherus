@@ -32,7 +32,9 @@ export class ParseError extends Error {
     }
     super(
       message ??
-        (expList.length > 0 ? `Expected ${expList.join(" or ")} at position ${position}` : undefined),
+        (expList.length > 0
+          ? `Expected ${expList.join(" or ")} at position ${position}`
+          : undefined),
     );
     this.expected = expList;
   }

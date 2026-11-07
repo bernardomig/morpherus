@@ -16,10 +16,7 @@ export function fail<Tok>(message?: string): Parser<never, Tok> {
   return (stream) => new ParseError(stream.position, message);
 }
 
-export function label<Tok, T>(
-  parser: Parser<T, Tok>,
-  expected: string,
-): Parser<T, Tok> {
+export function label<Tok, T>(parser: Parser<T, Tok>, expected: string): Parser<T, Tok> {
   return (stream) => {
     const out = parser(stream);
     if (out instanceof ParseError) {
@@ -42,9 +39,7 @@ export function lookAhead<Tok, T>(parser: Parser<T, Tok>): Parser<T, Tok> {
   };
 }
 
-export function notFollowedBy<Tok>(
-  parser: Parser<unknown, Tok>,
-): Parser<undefined, Tok> {
+export function notFollowedBy<Tok>(parser: Parser<unknown, Tok>): Parser<undefined, Tok> {
   return (stream) => {
     const out = parser(stream);
     if (out instanceof ParseError) return [undefined, stream];
@@ -379,7 +374,10 @@ export function pratt<Tok, T, Op extends PropertyKey>(
   operator: Parser<Op, Tok>,
   priority: Record<Op, number>,
 ): Parser<PrattTree<T, Op>, Tok> {
-  function parseExpr(stream: Stream<Tok, any>, minPriority: number): ParseResult<PrattTree<T, Op>, Tok> {
+  function parseExpr(
+    stream: Stream<Tok, any>,
+    minPriority: number,
+  ): ParseResult<PrattTree<T, Op>, Tok> {
     const first = value(stream);
     if (first instanceof ParseError) return first;
 
