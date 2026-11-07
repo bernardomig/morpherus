@@ -241,7 +241,7 @@ export function keepRight<Tok, T>(
   return keepOnly([left, right], 1);
 }
 
-export function eof<Tok>(stream: Stream<Tok>): ParseResult<EOS, Tok> {
+export function eof<Tok>(stream: Stream<Tok, any>): ParseResult<EOS, Tok> {
   if (stream.peek() === eos) return [eos, stream];
   return new UnexpectedInput(stream.position, undefined, undefined, "eof");
 }
@@ -379,7 +379,7 @@ export function pratt<Tok, T, Op extends PropertyKey>(
   operator: Parser<Op, Tok>,
   priority: Record<Op, number>,
 ): Parser<PrattTree<T, Op>, Tok> {
-  function parseExpr(stream: Stream<Tok>, minPriority: number): ParseResult<PrattTree<T, Op>, Tok> {
+  function parseExpr(stream: Stream<Tok, any>, minPriority: number): ParseResult<PrattTree<T, Op>, Tok> {
     const first = value(stream);
     if (first instanceof ParseError) return first;
 

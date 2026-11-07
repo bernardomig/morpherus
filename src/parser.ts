@@ -1,13 +1,15 @@
 import { eos, type Stream } from "./stream";
 
-export type ParseResult<T, Tok> = [T, Stream<Tok>] | ParseError;
-export type Parser<T, Tok> = (stream: Stream<Tok>) => ParseResult<T, Tok>;
+// `any` chunk: combinators are chunk-agnostic, so both `Stream<string, string>`
+// (StringStream) and `Stream<T, T[]>` (TokenStream) flow through them.
+export type ParseResult<T, Tok> = [T, Stream<Tok, any>] | ParseError;
+export type Parser<T, Tok> = (stream: Stream<Tok, any>) => ParseResult<T, Tok>;
 
 // Utility types
 export type ParserType<P extends Parser<any, any>> = P extends Parser<infer T, any> ? T : never;
 
 // run parser
-export function runParser<T, Tok>(parser: Parser<T, Tok>, stream: Stream<Tok>): T {
+export function runParser<T, Tok>(parser: Parser<T, Tok>, stream: Stream<Tok, any>): T {
   const out = parser(stream);
   if (out instanceof ParseError) throw out;
   const [value, s] = out;

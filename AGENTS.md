@@ -44,16 +44,21 @@ Every input source implements `Stream<T>`:
 export const eos: unique symbol = Symbol();
 export type EOS = typeof eos;
 
-export interface Stream<T> {
+export interface Stream<T, C = T[]> {
   readonly position: number;
   peek(): T | EOS;
-  consume(): Stream<T>;
+  peek(n: number): C | EOS;
+  consume(): Stream<T, C>;
+  consume(n: number): Stream<T, C>;
 }
 ```
 
-- **Immutability:** `consume()` **must** return a new `Stream<T>` instance positioned at `this.position + 1` without mutating the current stream instance.
+- **Chunk type `C`:** The second type parameter is the result type of `peek(n)` — a batch of `n` items read at once. `StringStream` implements `Stream<string, string>` (a slice of the input), while `TokenStream` implements `Stream<T>` (default `C = T[]`). Core types (`Parser`, `ParseResult`, `runParser`) use `Stream<Tok, any>` so any chunk type flows through the generic combinators; chunk-typed primitives (like `string()`) annotate their stream as `Stream<string, string>`.
+- **Chunk semantics:** `peek(n)` (for positive integers `n`) returns a chunk of exactly `n` items, or `eos` if fewer than `n` items remain. `consume(n)` advances by `n`; `consume(0)` **must** return the same stream instance (`this`) to preserve zero-progress detection.
+- **Immutability:** `consume()` / `consume(n)` **must** return a new `Stream<T, C>` instance positioned at `this.position + n` without mutating the current stream instance.
 - **Zero-Cost Backtracking:** Because streams are immutable cursor wrappers (`StringStream`, `TokenStream`), combinators like `oneOf`, `optional`, `many`, and `sepBy` backtrack automatically simply by reusing an earlier `Stream<T>` reference.
 - **Zero-Progress Detection:** Looping combinators (`many`, `some`, `sepBy1`, `chainl1`, `chainr1`, `pratt`) guard against infinite loops on zero-width inner parsers (e.g. `many(optional(...))`) by checking reference equality (`nextStream === currentStream`) and breaking cleanly.
+- **Fast paths:** `morpheus/string`'s `string()` combinator uses `peek(n)`/`consume(n)` to match whole literals in a single slice comparison + one allocation (fast path), falling back to per-character scanning on mismatch to report the exact failure position.
 
 ### 2. `Parser<T, Tok>` & `ParseResult<T, Tok>` (`src/parser.ts`)
 

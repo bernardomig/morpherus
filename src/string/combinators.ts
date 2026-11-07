@@ -1,6 +1,6 @@
 import { createForToken } from "../combinators";
 import { UnexpectedEOS, UnexpectedInput, type Parser } from "../parser";
-import { eos } from "../stream";
+import { eos, type Stream } from "../stream";
 
 const {
   between,
@@ -83,7 +83,15 @@ export function string<T extends string>(
   input: T,
   { caseSensitive = true }: { caseSensitive?: boolean } = {},
 ): Parser<T, string> {
-  return (stream) => {
+  const folded = caseSensitive ? input : input.toLowerCase();
+  return (stream: Stream<string, string>) => {
+    // Fast path: compare the whole chunk in one slice, allocating a single
+    // stream instead of one per character.
+    const chunk = stream.peek(input.length);
+    if (chunk !== eos && (caseSensitive ? chunk === input : chunk.toLowerCase() === folded)) {
+      return [input, stream.consume(input.length)];
+    }
+    // Slow path: walk character-by-character to report the exact failure position.
     let s = stream;
     for (let i = 0; i < input.length; i++) {
       const val = s.peek();

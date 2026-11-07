@@ -1,5 +1,5 @@
 import { UnexpectedEOS, UnexpectedInput, type Parser } from "../parser";
-import { eos, type Stream } from "../stream";
+import { eos, type EOS, type Stream } from "../stream";
 import { createForToken } from "../combinators";
 import type { UnionToIntersection } from "type-fest";
 
@@ -91,14 +91,23 @@ export class TokenStream<T extends [string, unknown]> implements Stream<T> {
     public readonly position: number = 0,
   ) {}
 
-  consume() {
-    return new TokenStream<T>(this.tokens, this.position + 1);
+  peek(): T | EOS;
+  peek(n: number): T[] | EOS;
+  peek(n = 1): T | T[] | EOS {
+    if (n === 1) {
+      const value = this.tokens[this.position];
+      if (value === undefined) return eos;
+      const [name, v] = value;
+      return [name, v] as T;
+    }
+    if (this.position + n > this.tokens.length) return eos;
+    return this.tokens.slice(this.position, this.position + n);
   }
 
-  peek() {
-    const value = this.tokens[this.position];
-    if (value === undefined) return eos;
-    const [n, v] = value;
-    return [n, v] as T;
+  consume(): TokenStream<T>;
+  consume(n: number): TokenStream<T>;
+  consume(n = 1): TokenStream<T> {
+    if (n === 0) return this;
+    return new TokenStream<T>(this.tokens, this.position + n);
   }
 }
