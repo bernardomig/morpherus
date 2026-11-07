@@ -13,8 +13,9 @@
   ],
   "scripts": {
     "build": "tsc",
+    "check": "bun test && tsc --noEmit -p tsconfig.test.json",
     "test": "bun test",
-    "typecheck": "tsc --noEmit -p tsconfig.test.json -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.test.json"
   },
   "dependencies": {
     "type-fest": "^5.9.0"
