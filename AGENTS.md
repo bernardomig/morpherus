@@ -100,7 +100,7 @@ Because TypeScript lacks partial type application, calling generic combinators d
 
 - **`pure(value)`**: Succeeds without consuming any input, returning `[value, stream]`.
 - **`fail(message?)`**: Always fails at the current stream position with `new ParseError(stream.position, message)`.
-- **`label(parser, expected)`**: Attaches `label = expected` (and formats `message`) on any `ParseError` returned by `parser`.
+- **`label(parser, expected)`**: Attaches `label = expected` (replacing `expected` and reformatting `message`) only on `ParseError`s that consumed no input (or that carry no `expected` tokens). Deeper errors that consumed input keep their more specific expectations (Parsec `<?>` semantics).
 - **`lookAhead(parser)`**: Runs `parser` and returns its value on success without advancing the stream (`[value, stream]`).
 - **`notFollowedBy(parser)`**: Succeeds with `[undefined, stream]` (without consuming input) only if `parser` fails; otherwise returns `UnexpectedInput(stream.position)`.
 - **`map(parser, fn)`**: Transforms the parsed value `I -> O` on success.

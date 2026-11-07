@@ -332,7 +332,8 @@ describe("Calculator with pratt parser", () => {
       expect((err as ParseError).expected).toEqual(["number literal"]);
     }
 
-    // label preserves deeper inner expected tokens when failing after consuming input
+    // label does not override a deeper error that consumed input — its more
+    // specific expected tokens survive untouched (Parsec `<?>` semantics)
     const labeledParens = label(
       between(char("("), numberLiteral, char(")")),
       "parenthesized number",
@@ -343,8 +344,38 @@ describe("Calculator with pratt parser", () => {
     } catch (err) {
       expect(err).toBeInstanceOf(UnexpectedEOS);
       expect((err as ParseError).position).toBe(3);
-      expect((err as ParseError).label).toBe("parenthesized number");
+      expect((err as ParseError).label).toBeUndefined();
       expect((err as ParseError).expected).toEqual([")"]);
+      expect((err as ParseError).message).toBe("Expected ) at position 3");
+    }
+
+    // Nested label: the outer label only applies when the inner parser failed
+    // without consuming input (or produced no expected tokens)
+    const nestedLabel = label(label(string("foo"), "inner"), "outer");
+
+    // Fails mid-literal on "fX" (consumed "f") → deeper error wins, outer
+    // label does not apply — and neither does the inner label for the same reason
+    try {
+      runParser(nestedLabel, new StringStream("fX"));
+      expect.unreachable("Should have failed mid-literal");
+    } catch (err) {
+      expect(err).toBeInstanceOf(UnexpectedInput);
+      expect((err as ParseError).position).toBe(1);
+      expect((err as ParseError).label).toBeUndefined();
+      expect((err as ParseError).expected).toEqual(["foo"]);
+      expect((err as ParseError).message).toBe("Expected foo at position 1");
+    }
+
+    // Fails at position 0 → no input consumed → outer label wins
+    try {
+      runParser(nestedLabel, new StringStream("bX"));
+      expect.unreachable("Should have failed at start");
+    } catch (err) {
+      expect(err).toBeInstanceOf(UnexpectedInput);
+      expect((err as ParseError).position).toBe(0);
+      expect((err as ParseError).label).toBe("outer");
+      expect((err as ParseError).expected).toEqual(["outer"]);
+      expect((err as ParseError).message).toBe("Expected outer at position 0");
     }
 
     // endBy & endBy1: semicolon-terminated expressions

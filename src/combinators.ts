@@ -17,15 +17,18 @@ export function fail<Tok>(message?: string): Parser<never, Tok> {
   return (stream) => new ParseError(stream.position, message);
 }
 
+// Parsec `<?>` semantics: only relabel errors that consumed no input (or that
+// carry no expected tokens at all). A deeper error that consumed input is more
+// specific than the outer label, so it passes through untouched.
 export function label<Tok, T>(parser: Parser<T, Tok>, expected: string): Parser<T, Tok> {
   return (stream) => {
     const out = parser(stream);
     if (out instanceof ParseError) {
-      out.label = expected;
       if (out.position === stream.position || out.expected.length === 0) {
+        out.label = expected;
         out.expected = [expected];
+        out.message = `Expected ${expected} at position ${out.position}`;
       }
-      out.message = `Expected ${out.expected.join(" or ")} at position ${out.position}`;
       return out;
     }
     return out;
