@@ -2,7 +2,6 @@
   "name": "morpheus",
   "version": "0.1.0",
   "type": "module",
-  "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -25,12 +24,11 @@
   ],
   "scripts": {
     "build": "rm -rf dist && tsc",
-    "check": "bun test && tsc --noEmit -p tsconfig.test.json",
+    "check": "bun check",
     "clean": "rm -rf dist",
     "fmt": "oxfmt --write src tests",
     "fmt:check": "oxfmt --check src tests",
-    "test": "bun test",
-    "typecheck": "tsc --noEmit -p tsconfig.test.json"
+    "test": "bun test --check"
   },
   "devDependencies": {
     "@types/bun": "latest",
