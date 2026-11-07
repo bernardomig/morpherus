@@ -5,7 +5,6 @@ import {
   bind,
   chainl1,
   chainr1,
-  char,
   digit,
   endBy,
   endBy1,
@@ -42,7 +41,7 @@ import {
 // Calculator Grammar using `pratt` and string combinators
 // ---------------------------------------------------------------------------
 
-const ws = many(oneOf([char(" "), char("\t"), char("\n"), char("\r")]));
+const ws = many(oneOf([string(" "), string("\t"), string("\n"), string("\r")]));
 
 function lexeme<T>(p: Parser<T>): Parser<T> {
   return between(ws, p, ws);
@@ -65,7 +64,7 @@ const priority: Record<Op, number> = {
 // Number literal: optional '-', integer digits, optional fractional part
 const numberLiteral: Parser<number> = lexeme(
   map(
-    seq([optional(char("-")), some(digit), optional(seq([char("."), some(digit)]))]),
+    seq([optional(string("-")), some(digit), optional(seq([string("."), some(digit)]))]),
     ([sign, intDigits, fracPart]) => {
       const intStr = intDigits.join("");
       const fracStr = fracPart ? `.${fracPart[1].join("")}` : "";
@@ -78,7 +77,7 @@ const numberLiteral: Parser<number> = lexeme(
 const constantLiteral: Parser<number> = lexeme(
   oneOf([
     map(string("pi", { caseSensitive: false }), () => Math.PI),
-    map(char("e", { caseSensitive: false }), () => Math.E),
+    map(string("e", { caseSensitive: false }), () => Math.E),
   ]),
 );
 
@@ -109,14 +108,14 @@ const exprTree: Parser<PrattTree<number, Op>> = ref((self) => {
   const evalSelf: Parser<number> = map(self, evalTree);
 
   // Parenthesized expression: ( expr )
-  const parens: Parser<number> = between(lexeme(char("(")), evalSelf, lexeme(char(")")));
+  const parens: Parser<number> = between(lexeme(string("(")), evalSelf, lexeme(string(")")));
 
   // Built-in function calls using `bind`, `sepEndBy`, `sepBy1`, `sepBy`
   const funcName = lexeme(enumOf(["sum", "max", "min", "pow"]));
   const funcCall: Parser<number> = bind(funcName, (fn) => {
-    const lparen = lexeme(char("("));
-    const rparen = lexeme(char(")"));
-    const comma = lexeme(char(","));
+    const lparen = lexeme(string("("));
+    const rparen = lexeme(string(")"));
+    const comma = lexeme(string(","));
 
     if (fn === "sum") {
       // Allows 0 or more arguments with optional trailing comma (sepEndBy)
@@ -223,7 +222,7 @@ describe("Calculator with pratt parser", () => {
 
   test("compares chainl1 and chainr1 associativity", () => {
     const num = lexeme(map(some(digit), (digits) => Number(digits.join(""))));
-    const powOp = map(lexeme(char("^")), () => (l: number, r: number) => l ** r);
+    const powOp = map(lexeme(string("^")), () => (l: number, r: number) => l ** r);
 
     const leftPow = chainl1(num, powOp);
     const rightPow = chainr1(num, powOp);
@@ -241,9 +240,9 @@ describe("Calculator with pratt parser", () => {
       [
         lexeme(string("let")),
         keepRight(ws, ident),
-        lexeme(char("=")),
+        lexeme(string("=")),
         map(exprTree, evalTree),
-        keepLeft(lexeme(char(";")), eof),
+        keepLeft(lexeme(string(";")), eof),
       ],
       3,
     );
@@ -252,9 +251,9 @@ describe("Calculator with pratt parser", () => {
 
     // Comma-separated list of expressions (0 or more) via sepBy
     const listParser = between(
-      lexeme(char("[")),
-      sepBy(map(exprTree, evalTree), lexeme(char(","))),
-      lexeme(char("]")),
+      lexeme(string("[")),
+      sepBy(map(exprTree, evalTree), lexeme(string(","))),
+      lexeme(string("]")),
     );
     expect(runParser(listParser, new StringStream("[]"))).toEqual([]);
     expect(runParser(listParser, new StringStream("[1 + 1, 2 * 3]"))).toEqual([2, 6]);
@@ -335,7 +334,7 @@ describe("Calculator with pratt parser", () => {
     // label does not override a deeper error that consumed input — its more
     // specific expected tokens survive untouched (Parsec `<?>` semantics)
     const labeledParens = label(
-      between(char("("), numberLiteral, char(")")),
+      between(string("("), numberLiteral, string(")")),
       "parenthesized number",
     );
     try {
@@ -379,7 +378,7 @@ describe("Calculator with pratt parser", () => {
     }
 
     // endBy & endBy1: semicolon-terminated expressions
-    const semi = lexeme(char(";"));
+    const semi = lexeme(string(";"));
     const exprVal = map(exprTree, evalTree);
     const statements0 = endBy(exprVal, semi);
     const statements1 = endBy1(exprVal, semi);
@@ -390,13 +389,13 @@ describe("Calculator with pratt parser", () => {
     expect(() => runParser(statements1, new StringStream(""))).toThrow();
 
     // lookAhead: peeks without consuming input
-    const peekPlus = seq([lookAhead(char("+")), char("+")]);
+    const peekPlus = seq([lookAhead(string("+")), string("+")]);
     expect(runParser(peekPlus, new StringStream("+"))).toEqual(["+", "+"]);
 
     // notFollowedBy: match `/` only when not followed by `/` (division vs line comment)
-    const divOp = keepLeft(char("/"), notFollowedBy(char("/")));
+    const divOp = keepLeft(string("/"), notFollowedBy(string("/")));
     expect(runParser(divOp, new StringStream("/"))).toBe("/");
-    expect(() => runParser(seq([divOp, char("/")]), new StringStream("//"))).toThrow(
+    expect(() => runParser(seq([divOp, string("/")]), new StringStream("//"))).toThrow(
       UnexpectedInput,
     );
   });

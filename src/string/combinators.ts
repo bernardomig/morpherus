@@ -64,21 +64,6 @@ export {
   some,
 };
 
-export function char<T extends string>(
-  input: T,
-  { caseSensitive = true }: { caseSensitive?: boolean } = {},
-): Parser<T, string> {
-  if (input.length !== 1)
-    throw new Error(`'input' argument to string/char must be a single character`);
-  return (stream) => {
-    const val = stream.peek();
-    if (val === eos) return new UnexpectedEOS(stream.position, undefined, undefined, input);
-    if (caseSensitive ? val !== input : val.toLowerCase() !== input.toLowerCase())
-      return new UnexpectedInput(stream.position, undefined, undefined, input);
-    return [input, stream.consume()];
-  };
-}
-
 export function string<T extends string>(
   input: T,
   { caseSensitive = true }: { caseSensitive?: boolean } = {},
@@ -115,12 +100,20 @@ export type VectorEnum<Ts extends string[]> = Ts extends [
     ? T
     : never;
 
+/**
+ * Matches one of the given literal strings.
+ *
+ * Alternatives are tried **longest-first**, so a shorter value cannot shadow a
+ * longer one that shares its prefix (e.g. `["let", "letter"]` tries `"letter"`
+ * before `"let"`). Equal-length values keep their declaration order.
+ */
 export function enumOf<Ts extends [string, ...string[]]>(
   values: readonly [...Ts],
   opts: { caseSensitive?: boolean } = {},
 ): Parser<VectorEnum<Ts>, string> {
+  const sorted = [...values].sort((a, b) => b.length - a.length);
   return oneOf(
-    values.map((x) => string(x, opts)) as [Parser<string, string>, ...Parser<string, string>[]],
+    sorted.map((x) => string(x, opts)) as [Parser<string, string>, ...Parser<string, string>[]],
   ) as Parser<VectorEnum<Ts>, string>;
 }
 
@@ -140,12 +133,21 @@ function isAlphanum(char: string): boolean {
   return isDigit(char) || isLetter(char);
 }
 
-export function satisfies(testFn: (arg: string) => boolean): Parser<string, string> {
+/**
+ * Matches a single character satisfying `testFn`. An optional `description` is
+ * reported as the expected input on failure (defaults to `"character"`), so
+ * errors never carry empty messages.
+ */
+export function satisfies(
+  testFn: (arg: string) => boolean,
+  description?: string,
+): Parser<string, string> {
+  const expected = description ?? "character";
   return (stream) => {
     const out = stream.peek();
-    if (out === eos) return new UnexpectedEOS(stream.position);
+    if (out === eos) return new UnexpectedEOS(stream.position, undefined, undefined, expected);
     if (testFn(out)) return [out, stream.consume()];
-    return new UnexpectedInput(stream.position);
+    return new UnexpectedInput(stream.position, undefined, undefined, expected);
   };
 }
 

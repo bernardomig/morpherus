@@ -7,9 +7,9 @@ combinators.
 
 ```ts
 import { runParser } from "morpheus";
-import { StringStream, char, many, seq } from "morpheus/string";
+import { StringStream, many, seq, string } from "morpheus/string";
 
-const parser = seq([char("a"), many(char("b"))]);
+const parser = seq([string("a"), many(string("b"))]);
 const result = runParser(parser, new StringStream("abbb")); // [["a", ["b", "b", "b"]], ...]
 ```
 

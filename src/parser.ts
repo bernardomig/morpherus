@@ -20,6 +20,8 @@ export function runParser<T, Tok>(parser: Parser<T, Tok>, stream: Stream<Tok, an
 
 export class ParseError extends Error {
   public expected: string[];
+  /** The raw `message` passed to the constructor, if any. Used by `label` to avoid clobbering user-supplied messages (e.g. from `fail`). */
+  public readonly customMessage?: string;
 
   constructor(
     public readonly position: number,
@@ -38,6 +40,7 @@ export class ParseError extends Error {
           : undefined),
     );
     this.expected = expList;
+    this.customMessage = message;
   }
 }
 

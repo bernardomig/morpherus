@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { eos, runParser, UnexpectedEOS, UnexpectedInput, seq, some, map } from "../src";
-import { string, char, digit, StringStream } from "../src/string";
+import { string, digit, StringStream } from "../src/string";
 import { Lexer, TokenStream, createCombinators } from "../src/lexer";
 
 describe("StringStream chunk access", () => {
@@ -81,6 +81,12 @@ describe("TokenStream chunk access", () => {
 });
 
 describe("string() chunk fast path", () => {
+  test("matches astral-plane characters (multiple UTF-16 code units)", () => {
+    const out = string("😀")(new StringStream("😀!"));
+    expect(out).toEqual(["😀", expect.objectContaining({ position: 2 })]);
+    expect(runParser(string("😀"), new StringStream("😀"))).toBe("😀");
+  });
+
   test("matches and consumes the whole input in one step", () => {
     const out = string("hello")(new StringStream("hello world"));
     expect(out).toEqual(["hello", expect.objectContaining({ position: 5 })]);
@@ -117,7 +123,7 @@ describe("string() chunk fast path", () => {
 
   test("integrates with runParser and repetition combinators", () => {
     const number = map(some(digit), (ds) => Number(ds.join("")));
-    const parser = seq([string("let"), number, char(";")]);
+    const parser = seq([string("let"), number, string(";")]);
     expect(runParser(parser, new StringStream("let123;"))).toEqual(["let", 123, ";"]);
   });
 });

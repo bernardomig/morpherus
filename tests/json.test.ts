@@ -3,7 +3,6 @@ import { runParser } from "../src";
 import { StringStream } from "../src/string/stringstream";
 import {
   between,
-  char,
   digit,
   eof,
   ignore,
@@ -55,16 +54,25 @@ const hexDigit = satisfies((c) => /[0-9a-fA-F]/.test(c));
 
 /** `\uXXXX` */
 const unicodeEscape = map(
-  seq([char("u"), hexDigit, hexDigit, hexDigit, hexDigit]),
+  seq([string("u"), hexDigit, hexDigit, hexDigit, hexDigit]),
   ([, a, b, c, d]) => String.fromCharCode(parseInt(a + b + c + d, 16)),
 );
 
 const simpleEscape = map(
-  oneOf([char('"'), char("\\"), char("/"), char("b"), char("f"), char("n"), char("r"), char("t")]),
+  oneOf([
+    string('"'),
+    string("\\"),
+    string("/"),
+    string("b"),
+    string("f"),
+    string("n"),
+    string("r"),
+    string("t"),
+  ]),
   (c) => escapeMap[c]!,
 );
 
-const escape = keepRight(char("\\"), oneOf([unicodeEscape, simpleEscape]));
+const escape = keepRight(string("\\"), oneOf([unicodeEscape, simpleEscape]));
 
 const jsonChar = oneOf([
   escape,
@@ -73,7 +81,7 @@ const jsonChar = oneOf([
 ]);
 
 const jsonString: Parser<string> = map(
-  keepLeft(between(char('"'), many(jsonChar), char('"')), whitespace),
+  keepLeft(between(string('"'), many(jsonChar), string('"')), whitespace),
   (chars) => chars.join(""),
 );
 
@@ -82,24 +90,27 @@ const jsonString: Parser<string> = map(
 // ---------------------------------------------------------------------------
 
 const exponent = seq([
-  oneOf([char("e"), char("E")]),
-  optional(oneOf([char("+"), char("-")])),
+  oneOf([string("e"), string("E")]),
+  optional(oneOf([string("+"), string("-")])),
   some(digit),
 ]);
 
-const fraction = seq([char("."), some(digit)]);
+const fraction = seq([string("."), some(digit)]);
 
 const nonZeroDigit = satisfies((c) => c >= "1" && c <= "9");
 
 // JSON forbids leading zeroes: either a lone `0` or a non-zero digit
 // followed by any number of digits.
 const intPart = oneOf([
-  char("0"),
+  string("0"),
   map(seq([nonZeroDigit, many(digit)]), ([first, rest]) => first + rest.join("")),
 ]);
 
 const jsonNumber: Parser<number> = map(
-  keepLeft(seq([optional(char("-")), intPart, optional(fraction), optional(exponent)]), whitespace),
+  keepLeft(
+    seq([optional(string("-")), intPart, optional(fraction), optional(exponent)]),
+    whitespace,
+  ),
   ([sign, int, frac, exp]) => {
     let text = sign ?? "";
     text += int;
@@ -126,19 +137,19 @@ const jsonNull: Parser<null> = map(lexeme(string("null")), () => null);
 
 const jsonValue: Parser<JsonValue> = ref((self) => {
   const member: Parser<[string, JsonValue]> = map(
-    seq([jsonString, ignore(lexeme(char(":"))), self]),
+    seq([jsonString, ignore(lexeme(string(":"))), self]),
     ([key, value]) => [key, value],
   );
 
   const jsonObject: Parser<{ [key: string]: JsonValue }> = map(
-    between(lexeme(char("{")), sepBy(member, lexeme(char(","))), lexeme(char("}"))),
+    between(lexeme(string("{")), sepBy(member, lexeme(string(","))), lexeme(string("}"))),
     (entries) => Object.fromEntries(entries),
   );
 
   const jsonArray: Parser<JsonValue[]> = between(
-    lexeme(char("[")),
-    sepBy(self, lexeme(char(","))),
-    lexeme(char("]")),
+    lexeme(string("[")),
+    sepBy(self, lexeme(string(","))),
+    lexeme(string("]")),
   );
 
   return oneOf([jsonObject, jsonArray, jsonString, jsonNumber, jsonBoolean, jsonNull]);

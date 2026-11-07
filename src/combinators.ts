@@ -27,7 +27,11 @@ export function label<Tok, T>(parser: Parser<T, Tok>, expected: string): Parser<
       if (out.position === stream.position || out.expected.length === 0) {
         out.label = expected;
         out.expected = [expected];
-        out.message = `Expected ${expected} at position ${out.position}`;
+        // Preserve user-supplied messages (e.g. `fail("...")`); only regenerate
+        // the default "Expected ... at position ..." text.
+        if (out.customMessage === undefined) {
+          out.message = `Expected ${expected} at position ${out.position}`;
+        }
       }
       return out;
     }
@@ -47,19 +51,19 @@ export function notFollowedBy<Tok>(parser: Parser<unknown, Tok>): Parser<undefin
   return (stream) => {
     const out = parser(stream);
     if (out instanceof ParseError) return [undefined, stream];
-    return new UnexpectedInput(stream.position);
+    return new UnexpectedInput(stream.position, `Unexpected input at position ${stream.position}`);
   };
 }
 
 export function bind<Tok, T, U>(
   parser: Parser<T, Tok>,
-  fmap: (value: T) => Parser<U, Tok>,
+  fn: (value: T) => Parser<U, Tok>,
 ): Parser<U, Tok> {
   return (stream) => {
     const out = parser(stream);
     if (out instanceof ParseError) return out;
     const [value, s] = out;
-    return fmap(value)(s);
+    return fn(value)(s);
   };
 }
 
@@ -91,10 +95,11 @@ function mergeErrors(a: ParseError, b: ParseError): ParseError {
 
   const mergedExpected = Array.from(new Set([...a.expected, ...b.expected]));
   const label = b.label ?? a.label;
+  // Leave `message` undefined when we can regenerate it from `expected`, so the
+  // error is not marked as carrying a custom message (which would stop `label`
+  // from reformatting it).
   const message =
-    mergedExpected.length > 0
-      ? `Expected ${mergedExpected.join(" or ")} at position ${a.position}`
-      : b.message || a.message || undefined;
+    mergedExpected.length > 0 ? undefined : b.customMessage || a.customMessage || undefined;
 
   if (a instanceof UnexpectedEOS || b instanceof UnexpectedEOS) {
     return new UnexpectedEOS(a.position, message, label, mergedExpected);
@@ -137,10 +142,9 @@ export type Seq<Tok, Ps extends readonly Parser<any, any>[]> = Ps extends [
     : [T, ...Seq<Tok, Rest>]
   : [];
 
-export function seq<
-  Ps extends readonly Parser<any, any>[],
-  Tok = TokenOf<Ps[number]>,
->(parsers: readonly [...Ps]): Parser<Seq<Tok, Ps>, Tok> {
+export function seq<Ps extends readonly Parser<any, any>[], Tok = TokenOf<Ps[number]>>(
+  parsers: readonly [...Ps],
+): Parser<Seq<Tok, Ps>, Tok> {
   return (stream) => {
     const outs: any[] = [];
     let s = stream;
@@ -375,6 +379,24 @@ export function chainr1<Tok, T>(
 
 export type PrattTree<T, Op> = T | [PrattTree<T, Op>, Op, PrattTree<T, Op>];
 
+/**
+ * Higher-order Pratt precedence-climbing parser. Takes an atom parser, an
+ * operator parser, and a precedence table, returning a
+ * `PrattTree<T, Op>` (`T | [left, Op, right]`, left-associative for equal
+ * precedence).
+ *
+ * **Committing semantics:** unlike `chainl1` / `chainr1`, once an operator has
+ * been matched, a failure in its right-hand side is *committed* — the error is
+ * returned as-is (pointing at the deepest failure position) instead of
+ * backtracking and yielding the left-hand accumulator. This yields better
+ * syntax errors, at the cost of reporting a failure rather than silently
+ * truncating a partially matched expression.
+ *
+ * **Non-progress / unknown operators:** an operator parser that succeeds
+ * without consuming input, or an operator with no entry in `priority` (possible
+ * for JS consumers or a mismatched operator parser), stops the climb with the
+ * operator left unconsumed instead of looping or comparing against `NaN`.
+ */
 export function pratt<Tok, T, Op extends PropertyKey>(
   value: Parser<T, Tok>,
   operator: Parser<Op, Tok>,
@@ -395,7 +417,13 @@ export function pratt<Tok, T, Op extends PropertyKey>(
       if (opOut instanceof ParseError) break;
 
       const [op, afterOp] = opOut;
-      const opPriority = priority[op];
+      // Zero-width operator: no progress, stop before recursing.
+      if (afterOp === s) break;
+
+      const opPriority: number | undefined = priority[op];
+      // Unknown operator (JS consumers / mismatched parser): leave it unconsumed
+      // rather than comparing against NaN.
+      if (opPriority === undefined) break;
       if (opPriority < minPriority) break;
 
       const rhsOut = parseExpr(afterOp, opPriority + 1);
@@ -436,7 +464,7 @@ export function createForToken<Tok>() {
     label: <T>(parser: Parser<T, Tok>, expected: string) => label<Tok, T>(parser, expected),
     lookAhead: <T>(parser: Parser<T, Tok>) => lookAhead<Tok, T>(parser),
     notFollowedBy: (parser: Parser<unknown, Tok>) => notFollowedBy<Tok>(parser),
-    bind: <T, U>(parser: Parser<T, Tok>, fmap: (arg: T) => Parser<U, Tok>) => bind(parser, fmap),
+    bind: <T, U>(parser: Parser<T, Tok>, fn: (arg: T) => Parser<U, Tok>) => bind(parser, fn),
     ignore: <T>(parser: Parser<T, Tok>) => ignore<T, Tok>(parser),
     oneOf: <Ps extends readonly [Parser<unknown, Tok>, ...Parser<unknown, Tok>[]]>(
       parserList: readonly [...Ps],

@@ -2,14 +2,18 @@
 
 **Morpheus** is a TypeScript parser combinator library inspired by Haskell's parser combinator libraries (`Parsec`, `Megaparsec`, `Attoparsec`, and `Control.Applicative`). It supports both scannerless character-by-character parsing (`morpheus/string`) and tokenized stream parsing (`morpheus/lexer`), as well as generic streams (`morpheus`).
 
+> **Agent skill:** `.agents/skills/morpheus/` contains a portable skill (`SKILL.md` + `references/api.md` + `references/patterns.md`) that teaches other agents to use this library. Keep it in sync when the public API changes.
+
 ---
 
 ## Commands & Tooling
 
 - **Runtime & Package Manager:** [Bun](https://bun.com)
 - **Install dependencies:** `bun install`
-- **Build (`tsc` to `dist/`):** `bun run build`
+- **Build (`tsc` to `dist/`):** `bun run build` (removes `dist/` first, so deleted sources don't leave stale artifacts)
 - **Run tests:** `bun test`
+- **Typecheck (src + tests):** `bun run typecheck`; **tests + typecheck:** `bun run check`
+- **Format (oxfmt):** `bun run fmt` / `bun run fmt:check`
 
 ---
 
@@ -24,7 +28,7 @@ src/
 ├── string/
 │   ├── index.ts            # Subpath entry ("morpheus/string"): string-specialized Parser<T>, StringStream, string combinators
 │   ├── stringstream.ts     # Immutable `StringStream` implementation of `Stream<string>`
-│   └── combinators.ts      # String primitives (`char`, `string`, `enumOf`, `satisfies`, `digit`, `letter`, `alpha`) + combinators
+│   └── combinators.ts      # String primitives (`string`, `enumOf`, `satisfies`, `digit`, `letter`, `alpha`) + combinators
 └── lexer/
     └── index.ts            # Subpath entry ("morpheus/lexer"): `Lexer`, `TokenStream`, and `createCombinators<T>()`
 tests/
@@ -79,6 +83,7 @@ export type Parser<T, Tok> = (stream: Stream<Tok>) => ParseResult<T, Tok>;
   - `UnexpectedEOS(position: number, message?: string, label?: string)`
   - `UnexpectedInput(position: number, message?: string, label?: string)`
 - All errors carry `readonly position: number` indicating the stream offset where parsing failed, and an optional `label?: string` populated by `label(parser, expected)`.
+- `customMessage` holds the raw `message` passed to the constructor (if any); `label` uses it to avoid overwriting user-supplied messages such as those from `fail`.
 - **Furthest-Error Selection in `oneOf`:** When all branches in `oneOf` fail, `oneOf` returns the `ParseError` with the largest `position` (preferring `UnexpectedEOS` on ties). This ensures deep syntax errors inside a partially matched branch (like an unclosed `(` in `(1 + 2`) are preserved rather than erased to the start of `oneOf`.
 
 ### 4. Currying Token Types via `createForToken<Tok>()` (`src/combinators.ts`)
@@ -100,7 +105,7 @@ Because TypeScript lacks partial type application, calling generic combinators d
 
 - **`pure(value)`**: Succeeds without consuming any input, returning `[value, stream]`.
 - **`fail(message?)`**: Always fails at the current stream position with `new ParseError(stream.position, message)`.
-- **`label(parser, expected)`**: Attaches `label = expected` (replacing `expected` and reformatting `message`) only on `ParseError`s that consumed no input (or that carry no `expected` tokens). Deeper errors that consumed input keep their more specific expectations (Parsec `<?>` semantics).
+- **`label(parser, expected)`**: Attaches `label = expected` (replacing `expected` and reformatting `message`) only on `ParseError`s that consumed no input (or that carry no `expected` tokens). Deeper errors that consumed input keep their more specific expectations (Parsec `<?>` semantics). Custom messages (e.g. from `fail`) are preserved.
 - **`lookAhead(parser)`**: Runs `parser` and returns its value on success without advancing the stream (`[value, stream]`).
 - **`notFollowedBy(parser)`**: Succeeds with `[undefined, stream]` (without consuming input) only if `parser` fails; otherwise returns `UnexpectedInput(stream.position)`.
 - **`map(parser, fn)`**: Transforms the parsed value `I -> O` on success.
@@ -114,21 +119,20 @@ Because TypeScript lacks partial type application, calling generic combinators d
 - **`endBy(item, sep)` / `endBy1(item, sep)`**: 0 or more (`T[]`) / 1 or more (`[T, ...T[]]`) items where every item must be terminated by `sep`.
 - **`keepOnly(parsers, index)` / `keepLeft(left, right)` / `keepRight(left, right)` / `between(left, parser, right)`**: Runs a sequence of parsers and returns only the selected element's value with exact static type inference (`ParserType<Ps[Ix]>`).
 - **`chainl1(item, op)` / `chainr1(item, op)`**: Parses 1+ occurrences of `item` separated by binary operator functions `(left: T, right: T) => T`, folding left- or right-associatively.
-- **`pratt(value, operator, priority)`**: Higher-order Pratt precedence-climbing parser. Takes an atom parser `Parser<T, Tok>`, operator parser `Parser<Op, Tok>`, and precedence map `Record<Op, number>`, returning `Parser<PrattTree<T, Op>, Tok>` where `PrattTree<T, Op> = T | [PrattTree<T, Op>, Op, PrattTree<T, Op>]` (left-associative for equal precedence).
+- **`pratt(value, operator, priority)`**: Higher-order Pratt precedence-climbing parser. Takes an atom parser `Parser<T, Tok>`, operator parser `Parser<Op, Tok>`, and precedence map `Record<Op, number>`, returning `Parser<PrattTree<T, Op>, Tok>` where `PrattTree<T, Op> = T | [PrattTree<T, Op>, Op, PrattTree<T, Op>]` (left-associative for equal precedence). Unlike `chainl1`/`chainr1`, it **commits** once an operator has been matched: a failing right-hand side returns the error (deepest position) instead of backtracking. An operator with no `priority` entry, or an operator parser that consumes no input, stops the climb with the operator left unconsumed.
 - **`ref(fn)`**: Fixed-point combinator for recursive grammars. Memoizes `const parser = fn(self)` once at construction time and forwards recursive calls through `self`.
 - **`eof`**: Parser that succeeds with `eos` (`Parser<EOS, Tok>`) only when `stream.peek() === eos`.
 
 ### String Primitives (`src/string/combinators.ts`)
 
-- **`char(c, { caseSensitive })`**: Matches a single character `c`, returning the literal type `T`.
-- **`string(s, { caseSensitive })`**: Matches an exact string `s` character-by-character, returning the literal type `T`.
-- **`enumOf([...strings], { caseSensitive })`**: Matches one of the literal strings, inferred as the union of string literals `VectorEnum<Ts>`.
-- **`satisfies(predicate)`**: Matches a single character satisfying `predicate(ch)`.
+- **`string(s, { caseSensitive })`**: Matches an exact string `s` (including a single character or astral-plane character), returning the literal type `T`.
+- **`enumOf([...strings], { caseSensitive })`**: Matches one of the literal strings, inferred as the union of string literals `VectorEnum<Ts>`. Alternatives are tried **longest-first**, so shorter values cannot shadow longer prefix-sharing ones (equal-length values keep declaration order).
+- **`satisfies(predicate, description?)`**: Matches a single character satisfying `predicate(ch)`. The optional `description` is reported as the expected input on failure (defaults to `"character"`), so errors are never empty.
 - **`digit` / `letter` / `alpha`**: Pre-built `satisfies` parsers for `[0-9]`, `[A-Za-z]`, and `[0-9A-Za-z]`.
 
 ### Lexer & Token Streams (`src/lexer/index.ts`)
 
-- **`new Lexer(def)`**: Accepts a record mapping token names to non-empty `string` literals or `RegExp` patterns. Pre-compiles sticky (`y`) regexes while preserving user flags (`i`, `u`, `m`, etc.) and guards against zero-length matches.
-- **`lexer.tokenize(input)`**: Generator yielding strongly-typed `[tokenName, matchedValue]` tuples.
+- **`new Lexer(def)`**: Accepts a record mapping token names to non-empty `string` literals or `RegExp` patterns. Pre-compiles sticky (`y`) regexes while preserving user flags (`i`, `u`, `m`, etc.) and rejects rules that can match the empty string. Rules are tried in **declaration order, first match wins**, so declare longer/prefix-overlapping rules first (e.g. `{ eqeq: "==", eq: "=" }`).
+- **`lexer.tokenize(input)`**: Generator yielding strongly-typed `[tokenName, matchedValue]` tuples. Unmatched input throws an error that includes the offset.
 - **`new TokenStream(tokens)`**: Immutable `Stream<T>` over an array of `[name, value]` tokens.
 - **`createCombinators<TokenTuple>()`**: Returns all core combinators alongside `token(name)`, which matches a token by name and resolves to its payload type.

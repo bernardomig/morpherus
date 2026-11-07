@@ -4,27 +4,37 @@
   "type": "module",
   "types": "dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./string": "./dist/string/index.js",
-    "./lexer": "./dist/lexer/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./string": {
+      "types": "./dist/string/index.d.ts",
+      "import": "./dist/string/index.js",
+      "default": "./dist/string/index.js"
+    },
+    "./lexer": {
+      "types": "./dist/lexer/index.d.ts",
+      "import": "./dist/lexer/index.js",
+      "default": "./dist/lexer/index.js"
+    }
   },
   "files": [
     "./dist"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf dist && tsc",
     "check": "bun test && tsc --noEmit -p tsconfig.test.json",
+    "clean": "rm -rf dist",
+    "fmt": "oxfmt --write src tests",
+    "fmt:check": "oxfmt --check src tests",
     "test": "bun test",
     "typecheck": "tsc --noEmit -p tsconfig.test.json"
   },
-  "dependencies": {
-    "type-fest": "^5.9.0"
-  },
   "devDependencies": {
     "@types/bun": "latest",
-    "oxfmt": "^0.77.0"
-  },
-  "peerDependencies": {
+    "oxfmt": "^0.77.0",
     "typescript": "^7"
   }
 }

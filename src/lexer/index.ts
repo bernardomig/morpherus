@@ -1,19 +1,27 @@
 import { UnexpectedEOS, UnexpectedInput, type Parser } from "../parser";
 import { eos, type EOS, type Stream } from "../stream";
 import { createForToken } from "../combinators";
-import type { UnionToIntersection } from "type-fest";
 
 export type TokenNames<T> = keyof T;
 
-type TokenType<T> = T extends { [K in keyof T]: unknown }
-  ? {
-      [K in keyof T]: [
-        K,
-        T[K] extends string ? T[K] : T[K] extends RegExp ? string : never,
-      ];
-    }[keyof T]
+// Minimal `UnionToIntersection` helper, inlined to avoid a dependency for
+// three lines of type-level code.
+type UnionToIntersection<U> = (U extends any ? (arg: U) => void : never) extends (
+  arg: infer I,
+) => void
+  ? I
   : never;
 
+type TokenType<T> = {
+  [K in keyof T]: [K, T[K] extends string ? T[K] : T[K] extends RegExp ? string : never];
+}[keyof T];
+
+/**
+ * An ordered lexer. Definitions are tried in **declaration order** at each
+ * position and the **first match wins**, so overlapping rules must be declared
+ * longest-first (e.g. `{ eqeq: "==", eq: "=" }`, not the reverse). The same
+ * caveat applies to regex rules such as `{ ident: /[a-z]+/, keyword: /let/ }`.
+ */
 export class Lexer<T extends Record<any, string | RegExp>> {
   private readonly rules: Array<[string, string | RegExp]>;
 
@@ -26,7 +34,14 @@ export class Lexer<T extends Record<any, string | RegExp>> {
         return [name, match];
       }
       const flags = match.flags.includes("y") ? match.flags : `${match.flags}y`;
-      return [name, new RegExp(match.source, flags)];
+      const compiled = new RegExp(match.source, flags);
+      // A rule that can match the empty string would silently make no progress.
+      if (compiled.test("")) {
+        throw new Error(
+          `Lexer rule '${name}' can match an empty string; use a pattern that consumes input`,
+        );
+      }
+      return [name, compiled];
     });
   }
 
@@ -55,35 +70,37 @@ export class Lexer<T extends Record<any, string | RegExp>> {
       }
       if (!matched)
         throw new Error(
-          `failed to match token: '${input.substring(cursor, cursor + 10)}'`,
+          `failed to match token at offset ${cursor}: '${input.substring(cursor, cursor + 10)}'`,
         );
     }
   }
 }
 
-export type TokenValues<T extends readonly [string, unknown]> =
-  UnionToIntersection<
-    T extends readonly [infer N extends string, infer V]
-      ? { [K in N]: V }
-      : never
-  >;
+export type TokenValues<T extends readonly [string, unknown]> = UnionToIntersection<
+  T extends readonly [infer N extends string, infer V] ? { [K in N]: V } : never
+>;
 
-export type ExtractNames<T extends readonly [string, unknown]> =
-  T extends readonly [infer N extends string, unknown] ? N : never;
+// Payload type for a single token name. Derived via `infer` rather than by
+// indexing `TokenValues<T>` directly, which TypeScript cannot resolve for a
+// generic `T` (TS2536).
+type TokenValue<T extends readonly [string, unknown], Name extends string> =
+  TokenValues<T> extends infer V ? (V extends Record<Name, unknown> ? V[Name] : never) : never;
+
+export type ExtractNames<T extends readonly [string, unknown]> = T extends readonly [
+  infer N extends string,
+  unknown,
+]
+  ? N
+  : never;
 
 const createTokenFn =
   <T extends readonly [string, unknown]>() =>
-  <Name extends ExtractNames<T>>(
-    name: Name,
-  ): Parser<TokenValues<T>[Name], T> => {
+  <Name extends ExtractNames<T>>(name: Name): Parser<TokenValue<T, Name>, T> => {
     return (stream) => {
       const tok = stream.peek();
-      if (tok === eos)
-        return new UnexpectedEOS(stream.position, undefined, undefined, name);
-      else if (tok[0] === name)
-        return [tok[1] as TokenValues<T>[Name], stream.consume()];
-      else
-        return new UnexpectedInput(stream.position, undefined, undefined, name);
+      if (tok === eos) return new UnexpectedEOS(stream.position, undefined, undefined, name);
+      else if (tok[0] === name) return [tok[1] as TokenValue<T, Name>, stream.consume()];
+      else return new UnexpectedInput(stream.position, undefined, undefined, name);
     };
   };
 
@@ -94,10 +111,7 @@ export function createCombinators<T extends readonly [string, unknown]>() {
   };
 }
 
-export class TokenStream<T extends [string, unknown]> implements Stream<
-  T,
-  T[]
-> {
+export class TokenStream<T extends [string, unknown]> implements Stream<T, T[]> {
   constructor(
     public readonly tokens: T[],
     public readonly position: number = 0,
