@@ -248,11 +248,11 @@ export function sepBy1<Tok, T>(
   itemParser: Parser<T, Tok>,
   sepParser: Parser<unknown, Tok>,
 ): Parser<[T, ...T[]], Tok> {
+  const restP = keepRight(sepParser, itemParser);
   return (stream) => {
     const first = itemParser(stream);
     if (first instanceof ParseError) return first;
     const rest: T[] = [];
-    const restP = keepRight(sepParser, itemParser);
     let s = first[1];
     let out = restP(s);
     while (!(out instanceof ParseError)) {
