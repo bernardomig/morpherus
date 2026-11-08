@@ -12,11 +12,11 @@ A parser is a plain function: `(stream) => [value, restStream] | ParseError`.
 
 1. **Pick the entry point — this decides the `Parser` type arity:**
 
-   | You are parsing | Import from | `Parser<T>` |
-   |---|---|---|
-   | Characters / strings (scannerless) | `morpheus/string` | one type param (`Tok` = `string`) |
-   | Tokens from a lexer | `morpheus/lexer` | use `createCombinators<TokenTuple>()` |
-   | A custom token stream | `morpheus` | two params: `Parser<T, Tok>` |
+   | You are parsing                    | Import from       | `Parser<T>`                           |
+   | ---------------------------------- | ----------------- | ------------------------------------- |
+   | Characters / strings (scannerless) | `morpheus/string` | one type param (`Tok` = `string`)     |
+   | Tokens from a lexer                | `morpheus/lexer`  | use `createCombinators<TokenTuple>()` |
+   | A custom token stream              | `morpheus`        | two params: `Parser<T, Tok>`          |
 
    Importing combinators from `morpheus` while working with strings works, but you must then
    write `Parser<T, string>`; prefer the `morpheus/string` entry point so `Parser<T>` suffices.
@@ -58,19 +58,19 @@ or inspect the raw parser result (`parser(stream)`) to assert on error fields.
 
 ## Combinator cheat sheet
 
-| Need | Combinator |
-|---|---|
-| Literal / alternatives | `string`, `enumOf` (tries **longest-first**), `satisfies` |
-| Sequence, keep all (drops `ignore(...)`) | `seq([...])` |
-| Ordered choice | `oneOf([...])` (furthest error wins) |
-| Keep one element | `keepOnly([...], i)`, `keepLeft`, `keepRight`, `between` |
-| Optional / repetition | `optional`, `many`, `some` |
-| Separated lists | `sepBy`/`sepBy1`, `sepEndBy`/`sepEndBy1`, `endBy`/`endBy1` |
-| Operators | `chainl1`, `chainr1`, `pratt` |
-| Recursion / laziness | `ref((self) => ...)` |
-| Transform / chain | `map`, `bind` |
-| Context / errors | `label`, `fail`, `lookAhead`, `notFollowedBy`, `eof` |
-| Zero-cost | `pure`, `ignore` (yields `ignored`, filtered by `seq`) |
+| Need                                     | Combinator                                                 |
+| ---------------------------------------- | ---------------------------------------------------------- |
+| Literal / alternatives                   | `string`, `enumOf` (tries **longest-first**), `satisfies`  |
+| Sequence, keep all (drops `ignore(...)`) | `seq([...])`                                               |
+| Ordered choice                           | `oneOf([...])` (furthest error wins)                       |
+| Keep one element                         | `keepOnly([...], i)`, `keepLeft`, `keepRight`, `between`   |
+| Optional / repetition                    | `optional`, `many`, `some`                                 |
+| Separated lists                          | `sepBy`/`sepBy1`, `sepEndBy`/`sepEndBy1`, `endBy`/`endBy1` |
+| Operators                                | `chainl1`, `chainr1`, `pratt`                              |
+| Recursion / laziness                     | `ref((self) => ...)`                                       |
+| Transform / chain                        | `map`, `bind`                                              |
+| Context / errors                         | `label`, `fail`, `lookAhead`, `notFollowedBy`, `eof`       |
+| Zero-cost                                | `pure`, `ignore` (yields `ignored`, filtered by `seq`)     |
 
 ## Behaviors that bite
 

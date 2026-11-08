@@ -4,11 +4,11 @@ Exact signatures and semantics. Chunk-type parameter `C` is omitted where irrele
 
 ## Entry points
 
-| Specifier | Runtime exports | Type-only exports |
-|---|---|---|
-| `morpheus` | all core combinators, `eos`, `runParser`, `ParseError`, `UnexpectedEOS`, `UnexpectedInput`, `ignored`, `createForToken` | `EOS`, `Stream`, `Parser`, `ParseResult`, `ParserType`, `TokenOf`, `Ignored`, `OneOf`, `Seq`, `PrattTree` |
-| `morpheus/string` | core combinators bound to `string`, `StringStream`, `string`, `enumOf`, `satisfies`, `digit`, `letter`, `alpha` | `Parser<T>` (one param), `VectorEnum` |
-| `morpheus/lexer` | `Lexer`, `TokenStream`, `createCombinators` | `TokenNames`, `TokenValues`, `ExtractNames` |
+| Specifier         | Runtime exports                                                                                                         | Type-only exports                                                                                         |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `morpheus`        | all core combinators, `eos`, `runParser`, `ParseError`, `UnexpectedEOS`, `UnexpectedInput`, `ignored`, `createForToken` | `EOS`, `Stream`, `Parser`, `ParseResult`, `ParserType`, `TokenOf`, `Ignored`, `OneOf`, `Seq`, `PrattTree` |
+| `morpheus/string` | core combinators bound to `string`, `StringStream`, `string`, `enumOf`, `satisfies`, `digit`, `letter`, `alpha`         | `Parser<T>` (one param), `VectorEnum`                                                                     |
+| `morpheus/lexer`  | `Lexer`, `TokenStream`, `createCombinators`                                                                             | `TokenNames`, `TokenValues`, `ExtractNames`                                                               |
 
 ## Core types
 

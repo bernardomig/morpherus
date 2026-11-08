@@ -1,6 +1,9 @@
 {
   "name": "morpheus",
   "version": "0.1.0",
+  "files": [
+    "./dist"
+  ],
   "type": "module",
   "exports": {
     ".": {
@@ -19,9 +22,6 @@
       "default": "./dist/lexer/index.js"
     }
   },
-  "files": [
-    "./dist"
-  ],
   "scripts": {
     "build": "rm -rf dist && tsc",
     "check": "bun check",

@@ -12,7 +12,7 @@ type UnionToIntersection<U> = (U extends any ? (arg: U) => void : never) extends
   ? I
   : never;
 
-type TokenType<T> = {
+export type TokenType<T> = {
   [K in keyof T]: [K, T[K] extends string ? T[K] : T[K] extends RegExp ? string : never];
 }[keyof T];
 

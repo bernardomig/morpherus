@@ -5,9 +5,32 @@ Copy-paste recipes. All snippets assume:
 ```ts
 import { runParser } from "morpheus";
 import {
-  between, bind, chainl1, digit, enumOf, fail, keepLeft, label, letter, lookAhead, many, map,
-  notFollowedBy, oneOf, optional, pratt, pure, ref, satisfies, sepBy, sepEndBy, seq, some,
-  string, StringStream, type Parser,
+  between,
+  bind,
+  chainl1,
+  digit,
+  enumOf,
+  fail,
+  keepLeft,
+  label,
+  letter,
+  lookAhead,
+  many,
+  map,
+  notFollowedBy,
+  oneOf,
+  optional,
+  pratt,
+  pure,
+  ref,
+  satisfies,
+  sepBy,
+  sepEndBy,
+  seq,
+  some,
+  string,
+  StringStream,
+  type Parser,
 } from "morpheus/string";
 import type { PrattTree } from "morpheus";
 ```
@@ -58,11 +81,16 @@ function evaluate(t: PrattTree<number, Op>): number {
   const a = evaluate(l);
   const b = evaluate(r);
   switch (op) {
-    case "+": return a + b;
-    case "-": return a - b;
-    case "*": return a * b;
-    case "/": return a / b;
-    case "^": return a ** b;
+    case "+":
+      return a + b;
+    case "-":
+      return a - b;
+    case "*":
+      return a * b;
+    case "/":
+      return a / b;
+    case "^":
+      return a ** b;
   }
 }
 
@@ -105,8 +133,8 @@ self type is already fixed (`const x: Parser<number> = ref(...)`).
 
 ```ts
 const semi = lexeme(string(";"));
-const statements = sepEndBy(value, semi);        // optional trailing separator
-const terminated = sepEndBy1(value, semi);       // requires >= 1 item
+const statements = sepEndBy(value, semi); // optional trailing separator
+const terminated = sepEndBy1(value, semi); // requires >= 1 item
 const each: Parser<number[]> = endBy(value, semi); // separator after every item
 
 runParser(statements, new StringStream("1; 2; 3;")); // [1, 2, 3]
@@ -209,16 +237,16 @@ Call the parser function directly to inspect the `ParseError`; `runParser` throw
 
 ## 10. Choosing between combinators
 
-| Situation | Use |
-|---|---|
-| Ordered alternatives, want best error | `oneOf` |
-| Optional prefix | `optional` |
-| Zero-or-more, stop at first failure | `many` / `sepBy` |
-| Structural delimiters, keep middle | `between` / `keepOnly` |
-| Line/statement terminators | `sepEndBy` / `endBy` |
-| Binary operators with precedence | `pratt` |
-| Left/right folding without precedence | `chainl1` / `chainr1` |
-| Recursive grammar | `ref` |
-| Dynamic next parser from a value | `bind` |
+| Situation                             | Use                    |
+| ------------------------------------- | ---------------------- |
+| Ordered alternatives, want best error | `oneOf`                |
+| Optional prefix                       | `optional`             |
+| Zero-or-more, stop at first failure   | `many` / `sepBy`       |
+| Structural delimiters, keep middle    | `between` / `keepOnly` |
+| Line/statement terminators            | `sepEndBy` / `endBy`   |
+| Binary operators with precedence      | `pratt`                |
+| Left/right folding without precedence | `chainl1` / `chainr1`  |
+| Recursive grammar                     | `ref`                  |
+| Dynamic next parser from a value      | `bind`                 |
 
 Avoid `many(optional(...))`: the zero-progress guard stops it, and it always yields `undefined`.
