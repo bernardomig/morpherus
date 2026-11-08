@@ -55,6 +55,20 @@ export function notFollowedBy<Tok>(parser: Parser<unknown, Tok>): Parser<undefin
   };
 }
 
+export function satisfies<Tok, T>(
+  parser: Parser<T, Tok>,
+  testFn: (arg: T) => boolean,
+): Parser<T, Tok> {
+  return (stream) => {
+    const out = parser(stream);
+    if (out instanceof ParseError) return out;
+    const [value, s] = out;
+
+    if (testFn(value)) return [value, s];
+    else return new UnexpectedInput(stream.position);
+  };
+}
+
 export function bind<Tok, T, U>(
   parser: Parser<T, Tok>,
   fn: (value: T) => Parser<U, Tok>,
@@ -464,6 +478,8 @@ export function createForToken<Tok>() {
     label: <T>(parser: Parser<T, Tok>, expected: string) => label<Tok, T>(parser, expected),
     lookAhead: <T>(parser: Parser<T, Tok>) => lookAhead<Tok, T>(parser),
     notFollowedBy: (parser: Parser<unknown, Tok>) => notFollowedBy<Tok>(parser),
+    satisfies: <T>(parser: Parser<T, Tok>, testFn: (arg: T) => boolean) =>
+      satisfies<Tok, T>(parser, testFn),
     bind: <T, U>(parser: Parser<T, Tok>, fn: (arg: T) => Parser<U, Tok>) => bind(parser, fn),
     ignore: <T>(parser: Parser<T, Tok>) => ignore<T, Tok>(parser),
     oneOf: <Ps extends readonly [Parser<unknown, Tok>, ...Parser<unknown, Tok>[]]>(
